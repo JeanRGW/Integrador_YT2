@@ -1,34 +1,35 @@
 {
-  "name": "integrador_yt2",
-  "version": "1.0.0",
-  "main": "dist/index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "tsx --watch src/index.ts"
-  },
-  "author": "JeanRGW, QuatiKWT",
-  "license": "ISC",
-  "description": "",
-  "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/express": "^5.0.3",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/multer": "^2.0.0",
-    "@types/node": "^24.5.2",
-    "@types/pg": "^8.15.5",
-    "drizzle-kit": "^0.31.5",
-    "prettier": "^3.6.2",
-    "tsx": "^4.20.6",
-    "typescript": "^5.9.2"
-  },
-  "dependencies": {
-    "bcryptjs": "^3.0.2",
-    "dotenv": "^17.2.3",
-    "drizzle-orm": "^0.44.6",
-    "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.2",
-    "pg": "^8.16.3",
-    "zod": "^4.1.11"
-  }
+	"name": "integrador_yt2",
+	"version": "1.0.0",
+	"main": "dist/index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"dev": "tsx --watch src/index.ts",
+		"format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\""
+	},
+	"author": "JeanRGW, QuatiKWT",
+	"license": "ISC",
+	"description": "",
+	"devDependencies": {
+		"@types/bcryptjs": "^2.4.6",
+		"@types/express": "^5.0.3",
+		"@types/jsonwebtoken": "^9.0.10",
+		"@types/multer": "^2.0.0",
+		"@types/node": "^24.5.2",
+		"@types/pg": "^8.15.5",
+		"drizzle-kit": "^0.31.5",
+		"prettier": "^3.6.2",
+		"tsx": "^4.20.6",
+		"typescript": "^5.9.2"
+	},
+	"dependencies": {
+		"bcryptjs": "^3.0.2",
+		"dotenv": "^17.2.3",
+		"drizzle-orm": "^0.44.6",
+		"express": "^5.1.0",
+		"jsonwebtoken": "^9.0.2",
+		"multer": "^2.0.2",
+		"pg": "^8.16.3",
+		"zod": "^4.1.11"
+	}
 }

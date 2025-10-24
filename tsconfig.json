@@ -1,21 +1,17 @@
 {
-  "compilerOptions": {
-    "esModuleInterop": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "moduleResolution": "node",
-    "module": "es2022",
-    "skipLibCheck": true,
-    "strict": true,
-    "target": "es2024",
-    "baseUrl": ".",
-    "paths": {
-      "@db/*": ["src/db/*"]
-    }
-  },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "drizzle.config.ts"
-  ]
+	"compilerOptions": {
+		"esModuleInterop": true,
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"moduleResolution": "node",
+		"module": "es2022",
+		"skipLibCheck": true,
+		"strict": true,
+		"target": "es2024",
+		"baseUrl": ".",
+		"paths": {
+			"@db/*": ["src/db/*"]
+		}
+	},
+	"exclude": ["node_modules", "dist", "drizzle.config.ts"]
 }

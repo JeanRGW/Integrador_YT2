@@ -1,6 +1,6 @@
 export type ValidationSchema = {
-    querySchema?: StrictZodObject;
-    bodySchema?: StrictZodObject;
-    paramsSchema?: StrictZodObject;
-    headerSchema?: StrictZodObject;
+	querySchema?: StrictZodObject;
+	bodySchema?: StrictZodObject;
+	paramsSchema?: StrictZodObject;
+	headerSchema?: StrictZodObject;
 };

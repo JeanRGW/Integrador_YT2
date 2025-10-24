@@ -18,4 +18,7 @@ export const usersRelations = relations(users, ({many}) => ({
     likes: many(videoLikes)
 }))
 
+export type UserInsert = typeof users.$inferInsert
+export type UserSelect = typeof users.$inferSelect
+
 export default users;

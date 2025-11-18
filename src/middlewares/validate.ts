@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import { ValidationSchema } from "src/types/types";
-import z from "zod";
 
 export const validate =
 	({ querySchema, bodySchema, paramsSchema, headerSchema }: ValidationSchema) =>

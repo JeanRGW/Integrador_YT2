@@ -13,3 +13,9 @@ export const updateUser = createUser
 	})
 	.partial();
 export type UpdateUser = z.infer<typeof updateUser>;
+
+export const signInUser = z.object({
+	email: z.email().transform((x) => x.toLowerCase()),
+	password: z.string().min(8),
+});
+export type SignInUser = z.infer<typeof signInUser>;

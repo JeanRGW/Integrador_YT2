@@ -3,7 +3,8 @@ import { users } from "@db/schema";
 import { hash, compare } from "bcryptjs";
 import { eq } from "drizzle-orm";
 import AppError from "src/lib/AppError";
-import { CreateUser, UpdateUser } from "src/schemas/userSchemas";
+import { CreateUser, SignInUser, UpdateUser } from "src/schemas/userSchemas";
+import { signToken } from "src/lib/jwt";
 
 export const createUser = async (userInsert: CreateUser) => {
 	const { email, name, password } = userInsert;
@@ -71,4 +72,20 @@ export const updateUser = async (uuid: string, userUpdate: UpdateUser) => {
 	const [updatedUser] = await db.update(users).set(data).where(eq(users.id, uuid)).returning();
 
 	return updatedUser;
+};
+
+export const signUser = async (data: SignInUser) => {
+	const { email, password } = data;
+
+	const user = await db.query.users.findFirst({
+		where: (t, { eq }) => eq(t.email, email),
+	});
+
+	if (!user) throw new AppError("Invalid credentials", 401);
+
+	const passwordMatch = await compare(password, user.pwHash);
+
+	if (!passwordMatch) throw new AppError("Invalid credentials", 401);
+
+	return { token: signToken(user.id) };
 };

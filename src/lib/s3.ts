@@ -1,0 +1,77 @@
+import {
+	S3Client,
+	GetObjectCommand,
+	HeadBucketCommand,
+	CreateBucketCommand,
+	HeadObjectCommand,
+	DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
+
+const { S3_ENDPOINT, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY, S3_BUCKET } = process.env;
+
+if (!S3_ENDPOINT) throw new Error("S3_ENDPOINT is not defined on environment.");
+if (!S3_BUCKET) throw new Error("S3_BUCKET is not defined on environment.");
+if (!S3_ACCESS_KEY || !S3_SECRET_KEY)
+	throw new Error("S3_ACCESS_KEY/S3_SECRET_KEY not defined on environment.");
+
+export const s3 = new S3Client({
+	region: S3_REGION || "us-east-1",
+	endpoint: S3_ENDPOINT,
+	forcePathStyle: true,
+	credentials: {
+		accessKeyId: S3_ACCESS_KEY!,
+		secretAccessKey: S3_SECRET_KEY!,
+	},
+});
+
+export const bucket = S3_BUCKET!;
+
+export const ensureBucket = async () => {
+	try {
+		await s3.send(new HeadBucketCommand({ Bucket: bucket }));
+	} catch {
+		await s3.send(new CreateBucketCommand({ Bucket: bucket }));
+	}
+};
+
+export const getVideoSignedUrl = async (key: string, expiresInSeconds = 900) => {
+	const cmd = new GetObjectCommand({ Bucket: bucket, Key: key });
+	return getSignedUrl(s3, cmd, { expiresIn: expiresInSeconds });
+};
+
+export const objectExists = async (key: string) => {
+	try {
+		await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+		return true;
+	} catch (err: any) {
+		if (err.name === "NotFound" || err.$metadata?.httpStatusCode === 404) return false;
+		throw err;
+	}
+};
+
+export const getPresignedPost = async (
+	key: string,
+	maxBytes = 2000 * 1024 * 1024,
+	contentType?: string,
+	expiresSeconds = 900,
+) => {
+	// Conditions: max size and optional content type enforcement
+	const conditions: any[] = [["content-length-range", 0, maxBytes]];
+	if (contentType) conditions.push(["eq", "$Content-Type", contentType]);
+
+	const presigned = await createPresignedPost(s3, {
+		Bucket: bucket,
+		Key: key,
+		Conditions: conditions,
+		Expires: expiresSeconds,
+	});
+
+	// presigned.fields + url to be used by client multipart form upload
+	return presigned;
+};
+
+export const deleteObject = async (key: string) => {
+	await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+};

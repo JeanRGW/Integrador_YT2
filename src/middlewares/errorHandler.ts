@@ -3,6 +3,13 @@ import AppError from "src/lib/AppError";
 import { ZodError } from "zod";
 
 export const errorHandler = async (err: any, req: Request, res: Response, next: NextFunction) => {
+	if (err instanceof SyntaxError) {
+		return res.status(400).json({
+			code: 400,
+			msg: "Invalid JSON payload",
+		});
+	}
+
 	if (err instanceof ZodError) {
 		return res.status(400).json({
 			code: 400,
@@ -16,6 +23,8 @@ export const errorHandler = async (err: any, req: Request, res: Response, next: 
 			msg: err.message,
 		});
 	}
+
+	console.error("Unhandled error:", err);
 
 	return res.status(500).json({
 		code: 500,

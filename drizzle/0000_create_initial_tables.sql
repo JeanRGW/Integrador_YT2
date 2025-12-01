@@ -1,3 +1,5 @@
+CREATE TYPE "public"."visibility" AS ENUM('hidden', 'link-only', 'public');--> statement-breakpoint
+CREATE TYPE "public"."like_type" AS ENUM('like', 'dislike');--> statement-breakpoint
 CREATE TABLE "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"name" text NOT NULL,

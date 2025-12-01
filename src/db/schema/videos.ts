@@ -4,7 +4,7 @@ import users from "./users";
 import { videoComments } from "./videoComments";
 import { videoLikes } from "./videoLikes";
 
-const visibilityEnum = pgEnum("visibility", ["hidden", "link-only", "public"]);
+export const visibilityEnum = pgEnum("visibility", ["hidden", "link-only", "public"]);
 
 export const videos = pgTable("videos", {
 	id: uuid("id").primaryKey().notNull().defaultRandom(),

@@ -3,7 +3,7 @@ import users from "./users";
 import videos from "./videos";
 import { relations } from "drizzle-orm";
 
-const typeEnum = pgEnum("like_type", ["like", "dislike"]);
+export const typeEnum = pgEnum("like_type", ["like", "dislike"]);
 
 export const videoLikes = pgTable("video_likes", {
 	id: uuid("id").primaryKey().notNull().defaultRandom(),

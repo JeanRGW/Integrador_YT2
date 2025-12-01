@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Presigned POST Upload Test</title>
+		<style>
+			body {
+				font-family: system-ui, sans-serif;
+				margin: 2rem;
+			}
+			fieldset {
+				margin-bottom: 1rem;
+			}
+			input,
+			select,
+			button {
+				padding: 0.5rem;
+				margin: 0.25rem 0;
+				width: 100%;
+			}
+			.row {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 1rem;
+			}
+			.log {
+				white-space: pre-wrap;
+				background: #f6f8fa;
+				padding: 1rem;
+				border: 1px solid #ddd;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Presigned POST Upload Test</h1>
+		<p>
+			This page tests the presigned POST workflow: initiate → direct upload to S3/MinIO → complete.
+		</p>
+
+		<fieldset>
+			<legend>Auth</legend>
+			<label>
+				JWT Token (Bearer):
+				<input id="token" type="text" placeholder="eyJhbGciOi..." />
+			</label>
+		</fieldset>
+
+		<fieldset>
+			<legend>Video Metadata</legend>
+			<div class="row">
+				<label>
+					Title
+					<input id="title" type="text" value="My Test Video" />
+				</label>
+				<label>
+					Visibility
+					<select id="visibility">
+						<option value="public">public</option>
+						<option value="link-only">link-only</option>
+						<option value="hidden">hidden</option>
+					</select>
+				</label>
+			</div>
+			<label>
+				Description
+				<input id="description" type="text" value="Testing presigned POST upload" />
+			</label>
+			<label>
+				Video File
+				<input id="file" type="file" accept="video/*" />
+			</label>
+		</fieldset>
+
+		<div class="row">
+			<button id="btn-initiate">1) Initiate Upload</button>
+			<button id="btn-upload" disabled>2) Upload to S3/MinIO</button>
+		</div>
+		<div class="row">
+			<button id="btn-complete" disabled>3) Complete Upload</button>
+			<button id="btn-reset">Reset</button>
+		</div>
+
+		<h3>Log</h3>
+		<div class="log" id="log"></div>
+
+		<script>
+			const apiBase = "http://localhost:3000/api";
+			let presigned = null; // { url, fields }
+			let key = null; // S3 object key
+			let lastFile = null; // File selected
+
+			const $ = (id) => document.getElementById(id);
+			const log = (msg, obj) => {
+				const out = obj ? `${msg}:\n${JSON.stringify(obj, null, 2)}` : msg;
+				const el = $("log");
+				el.textContent = `${el.textContent}\n\n${out}`.trim();
+			};
+
+			$("btn-reset").onclick = () => {
+				presigned = null;
+				key = null;
+				lastFile = null;
+				$("btn-upload").disabled = true;
+				$("btn-complete").disabled = true;
+				$("log").textContent = "";
+				$("file").value = "";
+			};
+
+			$("btn-initiate").onclick = async () => {
+				try {
+					const token = $("token").value.trim();
+					const file = $("file").files[0];
+					if (!token) return alert("Provide JWT token");
+					if (!file) return alert("Choose a video file");
+					lastFile = file;
+
+					const body = {
+						title: $("title").value.trim(),
+						description: $("description").value.trim(),
+						visibility: $("visibility").value,
+						filename: file.name,
+						contentType: file.type || "video/mp4",
+						declaredSize: file.size,
+					};
+
+					const res = await fetch(`${apiBase}/videos/initiate`, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${token}`,
+						},
+						body: JSON.stringify(body),
+					});
+					const data = await res.json();
+					if (!res.ok) throw new Error(data?.msg || res.statusText);
+
+					// data: { key, upload: { url, fields } }
+					key = data.key;
+					presigned = data.upload;
+					$("btn-upload").disabled = false;
+					log("Initiate response", data);
+				} catch (e) {
+					log("Initiate error", { error: String(e) });
+				}
+			};
+
+			$("btn-upload").onclick = async () => {
+				try {
+					if (!presigned || !lastFile) return alert("Run initiate and select a file first");
+					const form = new FormData();
+					// Append presigned fields first
+					Object.entries(presigned.fields).forEach(([k, v]) => form.append(k, v));
+					// Critical: if policy requires Content-Type, include it as a form field
+					if (!presigned.fields["Content-Type"] && lastFile.type) {
+						form.append("Content-Type", lastFile.type);
+					}
+					// Then the file field named "file"
+					form.append("file", lastFile);
+
+					const uploadRes = await fetch(presigned.url, { method: "POST", body: form });
+					if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);
+
+					$("btn-complete").disabled = true; // enable after short delay or directly
+					$("btn-complete").disabled = false;
+					log("Upload success (S3/MinIO response)", { status: uploadRes.status });
+				} catch (e) {
+					log("Upload error", { error: String(e) });
+				}
+			};
+
+			$("btn-complete").onclick = async () => {
+				try {
+					const token = $("token").value.trim();
+					if (!token) return alert("Provide JWT token");
+					if (!key) return alert("No key; run initiate first");
+
+					const body = {
+						key,
+						title: $("title").value.trim(),
+						description: $("description").value.trim(),
+						visibility: $("visibility").value,
+						videoLength: 0,
+					};
+
+					const res = await fetch(`${apiBase}/videos/complete`, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${token}`,
+						},
+						body: JSON.stringify(body),
+					});
+					const data = await res.json();
+					if (!res.ok) throw new Error(data?.msg || res.statusText);
+
+					log("Complete response (video created)", data);
+				} catch (e) {
+					log("Complete error", { error: String(e) });
+				}
+			};
+		</script>
+	</body>
+</html>

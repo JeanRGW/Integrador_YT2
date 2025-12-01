@@ -1,7 +1,7 @@
 import { Router } from "express";
 import * as userController from "../controllers/user.controller";
 import { validate } from "src/middlewares/validate";
-import { createUser, updateUser } from "src/schemas/userSchemas";
+import { createUser, updateUser, signInUser } from "src/schemas/userSchemas";
 import { auth } from "src/middlewares/auth";
 
 const router = Router();
@@ -23,6 +23,14 @@ router.put(
 		bodySchema: updateUser,
 	}),
 	userController.updateMe,
+);
+
+router.post(
+	"/signin",
+	validate({
+		bodySchema: signInUser,
+	}),
+	userController.signIn,
 );
 
 export default router;

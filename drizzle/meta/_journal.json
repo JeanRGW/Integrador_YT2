@@ -5,8 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1759727060549,
-      "tag": "0000_createInitialTables",
+      "when": 1764619004980,
+      "tag": "0000_create_initial_tables",
       "breakpoints": true
     }
   ]

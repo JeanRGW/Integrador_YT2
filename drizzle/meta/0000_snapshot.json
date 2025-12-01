@@ -1,5 +1,5 @@
 {
-  "id": "cc33ad10-e5d8-48ca-bdc7-8c280c6b71a6",
+  "id": "4a718d8d-1bc6-439f-a72a-7b78b89d0316",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -288,7 +288,25 @@
       "isRLSEnabled": false
     }
   },
-  "enums": {},
+  "enums": {
+    "public.visibility": {
+      "name": "visibility",
+      "schema": "public",
+      "values": [
+        "hidden",
+        "link-only",
+        "public"
+      ]
+    },
+    "public.like_type": {
+      "name": "like_type",
+      "schema": "public",
+      "values": [
+        "like",
+        "dislike"
+      ]
+    }
+  },
   "schemas": {},
   "sequences": {},
   "roles": {},

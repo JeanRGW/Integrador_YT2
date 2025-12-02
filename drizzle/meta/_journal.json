@@ -8,6 +8,13 @@
       "when": 1764619004980,
       "tag": "0000_create_initial_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1764632297842,
+      "tag": "0001_create_pending_uploads_table",
+      "breakpoints": true
     }
   ]
 }

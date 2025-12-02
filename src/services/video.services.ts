@@ -53,6 +53,42 @@ export const listUserVideos = async (userId: string) => {
 	return videosList;
 };
 
+/**
+ * Lists videos for a given user, applying access control based on the requester.
+ *
+ * - If the requester is the owner (`requesterId === targetUserId`), all videos are returned.
+ * - If the requester is not the owner (or unauthenticated), only videos with `visibility: "public"` are returned.
+ *
+ * @param targetUserId - The user whose videos are being listed.
+ * @param requesterId - The ID of the user making the request, or undefined if unauthenticated.
+ * @param options - Optional pagination options: `page` (1-based) and `pageSize`.
+ * @returns A paginated list of videos visible to the requester.
+ */
+export const listUserVideosForRequester = async (
+	targetUserId: string,
+	requesterId: string | undefined,
+	options?: { page?: number; pageSize?: number },
+) => {
+	const page = options?.page && options.page > 0 ? options.page : 1;
+	const pageSize = options?.pageSize && options.pageSize > 0 ? options.pageSize : 10;
+	const offset = (page - 1) * pageSize;
+
+	if (requesterId && requesterId === targetUserId) {
+		// Owner: sees all
+		return db.query.videos.findMany({
+			where: (t, { eq }) => eq(t.userId, targetUserId),
+			limit: pageSize,
+			offset,
+		});
+	}
+	// Non-owner: filter by visibility (public only)
+	return db.query.videos.findMany({
+		where: (t, { eq, and }) => and(eq(t.userId, targetUserId), eq(t.visibility, "public")),
+		limit: pageSize,
+		offset,
+	});
+};
+
 export const getVideoStreamUrl = async (id: string) => {
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, id),

@@ -36,3 +36,23 @@ export const updateVideo = z
 	})
 	.strict();
 export type UpdateVideo = z.infer<typeof updateVideo>;
+
+// Webhook body validation
+export const processedWebhook = z
+	.object({
+		pendingKey: z.string().min(1),
+		finalKey: z.string().min(1),
+		meta: z
+			.object({
+				durationSec: z.number().nullable().optional(),
+				width: z.number().nullable().optional(),
+				height: z.number().nullable().optional(),
+			})
+			.optional(),
+		userId: z.string().optional(),
+		title: z.string().min(1).optional(),
+		description: z.string().min(1).optional(),
+		visibility: z.enum(["hidden", "link-only", "public"]).optional(),
+	})
+	.strict();
+export type ProcessedWebhook = z.infer<typeof processedWebhook>;

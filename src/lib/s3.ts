@@ -9,10 +9,18 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 
-const { S3_ENDPOINT, S3_REGION, S3_ACCESS_KEY, S3_SECRET_KEY, S3_BUCKET } = process.env;
+const {
+	S3_ENDPOINT,
+	S3_REGION,
+	S3_ACCESS_KEY,
+	S3_SECRET_KEY,
+	S3_UPLOADS_BUCKET,
+	S3_VIDEOS_BUCKET,
+} = process.env;
 
 if (!S3_ENDPOINT) throw new Error("S3_ENDPOINT is not defined on environment.");
-if (!S3_BUCKET) throw new Error("S3_BUCKET is not defined on environment.");
+if (!S3_UPLOADS_BUCKET) throw new Error("S3_UPLOADS_BUCKET is not defined on environment.");
+if (!S3_VIDEOS_BUCKET) throw new Error("S3_VIDEOS_BUCKET is not defined on environment.");
 if (!S3_ACCESS_KEY || !S3_SECRET_KEY)
 	throw new Error("S3_ACCESS_KEY/S3_SECRET_KEY not defined on environment.");
 
@@ -26,22 +34,28 @@ export const s3 = new S3Client({
 	},
 });
 
-export const bucket = S3_BUCKET!;
+export const uploadsBucket = S3_UPLOADS_BUCKET!;
+export const videosBucket = S3_VIDEOS_BUCKET!;
 
-export const ensureBucket = async () => {
+export const ensureBuckets = async () => {
 	try {
-		await s3.send(new HeadBucketCommand({ Bucket: bucket }));
+		await s3.send(new HeadBucketCommand({ Bucket: uploadsBucket }));
 	} catch {
-		await s3.send(new CreateBucketCommand({ Bucket: bucket }));
+		await s3.send(new CreateBucketCommand({ Bucket: uploadsBucket }));
+	}
+	try {
+		await s3.send(new HeadBucketCommand({ Bucket: videosBucket }));
+	} catch {
+		await s3.send(new CreateBucketCommand({ Bucket: videosBucket }));
 	}
 };
 
 export const getVideoSignedUrl = async (key: string, expiresInSeconds = 900) => {
-	const cmd = new GetObjectCommand({ Bucket: bucket, Key: key });
+	const cmd = new GetObjectCommand({ Bucket: videosBucket, Key: key });
 	return getSignedUrl(s3, cmd, { expiresIn: expiresInSeconds });
 };
 
-export const objectExists = async (key: string) => {
+export const objectExists = async (bucket: string, key: string) => {
 	try {
 		await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
 		return true;
@@ -51,7 +65,7 @@ export const objectExists = async (key: string) => {
 	}
 };
 
-export const getPresignedPost = async (
+export const getPresignedPostForUploads = async (
 	key: string,
 	maxBytes = 2000 * 1024 * 1024,
 	contentType?: string,
@@ -62,7 +76,7 @@ export const getPresignedPost = async (
 	if (contentType) conditions.push(["eq", "$Content-Type", contentType]);
 
 	const presigned = await createPresignedPost(s3, {
-		Bucket: bucket,
+		Bucket: uploadsBucket,
 		Key: key,
 		Conditions: conditions,
 		Expires: expiresSeconds,
@@ -72,6 +86,6 @@ export const getPresignedPost = async (
 	return presigned;
 };
 
-export const deleteObject = async (key: string) => {
+export const deleteObject = async (bucket: string, key: string) => {
 	await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 };

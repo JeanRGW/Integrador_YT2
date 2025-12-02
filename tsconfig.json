@@ -13,5 +13,5 @@
 			"@db/*": ["src/db/*"]
 		}
 	},
-	"exclude": ["node_modules", "dist", "drizzle.config.ts"]
+	"exclude": ["node_modules", "dist", "drizzle.config.ts", "transcoder"]
 }

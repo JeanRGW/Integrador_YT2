@@ -1,16 +1,20 @@
 import "dotenv/config";
+import { validateEnv } from "./lib/env";
+
+validateEnv();
+
 import express from "express";
 import cors from "cors";
 import { errorHandler } from "./middlewares/errorHandler";
-import { ensureBucket } from "./lib/s3";
+import { ensureBuckets } from "./lib/s3";
 import apiRouter from "./routes/index";
 
 (async () => {
 	try {
-		await ensureBucket();
-		console.log("S3 bucket ready");
+		await ensureBuckets();
+		console.log("S3 buckets ready");
 	} catch (e) {
-		console.error("Failed to ensure S3 bucket", e);
+		console.error("Failed to ensure S3 buckets", e);
 	}
 })();
 

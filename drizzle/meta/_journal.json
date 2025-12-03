@@ -22,6 +22,13 @@
       "when": 1764739622260,
       "tag": "0002_expanded_pending_uploads_table",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1764794900401,
+      "tag": "0003_create_database_level_on_delete_on_update",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgEnum, pgTable, serial, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { AnyPgColumn, pgEnum, pgTable, serial, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import users from "./users";
 import { visibilityEnum } from "./videos";
 
@@ -13,7 +13,12 @@ export const pendingStatusEnum = pgEnum("pending_status", [
 
 export const pendingUploads = pgTable("pending_uploads", {
 	id: serial("id").primaryKey().notNull(),
-	userId: uuid("user_id").notNull(),
+	userId: uuid("user_id")
+		.notNull()
+		.references((): AnyPgColumn => users.id, {
+			onDelete: "cascade",
+			onUpdate: "cascade",
+		}),
 	key: text("key").notNull(),
 	filename: text("filename"),
 	contentType: text("content_type"),

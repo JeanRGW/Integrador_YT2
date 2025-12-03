@@ -10,7 +10,10 @@ export const videos = pgTable("videos", {
 	id: uuid("id").primaryKey().notNull().defaultRandom(),
 	userId: uuid("user_id")
 		.notNull()
-		.references((): AnyPgColumn => users.id),
+		.references((): AnyPgColumn => users.id, {
+			onUpdate: "cascade",
+			onDelete: "cascade",
+		}),
 	title: text("title").notNull(),
 	description: text("description").notNull(),
 	visibility: visibilityEnum("visibility").notNull().default("public"),

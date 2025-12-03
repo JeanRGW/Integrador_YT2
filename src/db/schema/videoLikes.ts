@@ -9,10 +9,16 @@ export const videoLikes = pgTable("video_likes", {
 	id: uuid("id").primaryKey().notNull().defaultRandom(),
 	userId: uuid("user_id")
 		.notNull()
-		.references((): AnyPgColumn => users.id),
+		.references((): AnyPgColumn => users.id, {
+			onDelete: "cascade",
+			onUpdate: "cascade",
+		}),
 	videoId: uuid("video_id")
 		.notNull()
-		.references((): AnyPgColumn => videos.id),
+		.references((): AnyPgColumn => videos.id, {
+			onDelete: "cascade",
+			onUpdate: "cascade",
+		}),
 	type: typeEnum("type").notNull(),
 });
 

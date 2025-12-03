@@ -7,10 +7,16 @@ export const videoComments = pgTable("video_comments", {
 	id: uuid("id").primaryKey().notNull().defaultRandom(),
 	userId: uuid("user_id")
 		.notNull()
-		.references((): AnyPgColumn => users.id),
+		.references((): AnyPgColumn => users.id, {
+			onUpdate: "cascade",
+			onDelete: "cascade",
+		}),
 	videoId: uuid("video_id")
 		.notNull()
-		.references((): AnyPgColumn => videos.id),
+		.references((): AnyPgColumn => videos.id, {
+			onUpdate: "cascade",
+			onDelete: "cascade",
+		}),
 	text: text("text").notNull(),
 	date: date("date").notNull().defaultNow(),
 });

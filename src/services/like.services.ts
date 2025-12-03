@@ -129,6 +129,14 @@ export const removeLike = async (videoId: string, userId: string) => {
 	if (!existing) throw new AppError("Like/dislike not found", 404);
 
 	await db.delete(videoLikes).where(eq(videoLikes.id, existing.id));
+	await db
+		.update(videos)
+		.set(
+			existing.type === "like"
+				? { likeCount: sql`${videos.likeCount} - 1` }
+				: { dislikeCount: sql`${videos.dislikeCount} - 1` },
+		)
+		.where(eq(videos.id, videoId));
 
 	return { message: "Like/dislike removed successfully" };
 };

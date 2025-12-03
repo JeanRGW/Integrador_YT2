@@ -15,6 +15,15 @@ import { users } from "@db/schema";
 export const getVideo = async (id: string, requesterId?: string) => {
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, id),
+		with: {
+			owner: {
+				columns: {
+					id: true,
+					name: true,
+					photoUrl: true,
+				},
+			},
+		},
 	});
 
 	if (!video) throw new AppError("Video not found", 404);
@@ -45,6 +54,15 @@ export const updateVideo = async (id: string, userId: string, data: UpdateVideo)
 export const listUserVideos = async (userId: string) => {
 	const videosList = await db.query.videos.findMany({
 		where: (t, { eq }) => eq(t.userId, userId),
+		with: {
+			owner: {
+				columns: {
+					id: true,
+					name: true,
+					photoUrl: true,
+				},
+			},
+		},
 	});
 	return videosList;
 };
@@ -75,6 +93,15 @@ export const listUserVideosForRequester = async (
 			where: (t, { eq }) => eq(t.userId, targetUserId),
 			limit: pageSize,
 			offset,
+			with: {
+				owner: {
+					columns: {
+						id: true,
+						name: true,
+						photoUrl: true,
+					},
+				},
+			},
 		});
 	}
 	// Non-owner: filter by visibility (public only)
@@ -82,6 +109,15 @@ export const listUserVideosForRequester = async (
 		where: (t, { eq, and }) => and(eq(t.userId, targetUserId), eq(t.visibility, "public")),
 		limit: pageSize,
 		offset,
+		with: {
+			owner: {
+				columns: {
+					id: true,
+					name: true,
+					photoUrl: true,
+				},
+			},
+		},
 	});
 };
 
@@ -203,6 +239,7 @@ export const searchVideos = async (filters: SearchVideos, requesterId?: string) 
 			videoLength: videos.videoLength,
 			video: videos.video,
 			uploaderName: users.name,
+			uploaderPhotoUrl: users.photoUrl,
 		})
 		.from(videos)
 		.innerJoin(users, eq(videos.userId, users.id));

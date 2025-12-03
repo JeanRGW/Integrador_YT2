@@ -54,7 +54,7 @@ export const ensureBuckets = async () => {
 	try {
 		await s3.send(new HeadBucketCommand({ Bucket: imagesBucket }));
 	} catch {
-		await s3.send(new CreateBucketCommand({ Bucket: imagesBucket }));
+		await s3.send(new CreateBucketCommand({ Bucket: imagesBucket, ACL: "public-read" }));
 	}
 };
 

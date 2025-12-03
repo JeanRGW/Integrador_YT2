@@ -47,6 +47,14 @@ router.put(
 	videoController.updateVideo,
 );
 
+// Delete video
+router.delete(
+	"/:id",
+	auth(),
+	validate({ paramsSchema: z.object({ id: z.uuid() }) }),
+	videoController.deleteVideo,
+);
+
 // Get video stream URL
 router.get(
 	"/:id/stream",

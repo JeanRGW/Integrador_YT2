@@ -2,13 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import * as videoService from "../services/video.services";
 import AppError from "src/lib/AppError";
 import { getVideoStreamUrl } from "src/services/video.services";
-import {
-	getPresignedPostForUploads,
-	objectExists,
-	uploadsBucket,
-	videosBucket,
-	deleteObject,
-} from "src/lib/s3";
+import { getPresignedPostForUploads, objectExists, uploadsBucket, deleteObject } from "src/lib/s3";
 import db from "@db/index";
 import { randomUUID } from "node:crypto";
 import { pendingUploads, videos } from "@db/schema";
@@ -104,6 +98,15 @@ export const updateVideo = async (req: Request, res: Response, next: NextFunctio
 		const video = await videoService.updateVideo(req.params.id, req.user!.id, req.body);
 
 		return res.json(video);
+	} catch (err) {
+		next(err);
+	}
+};
+
+export const deleteVideo = async (req: Request, res: Response, next: NextFunction) => {
+	try {
+		const result = await videoService.deleteVideo(req.params.id, req.user!.id);
+		return res.json(result);
 	} catch (err) {
 		next(err);
 	}

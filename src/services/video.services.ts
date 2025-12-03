@@ -3,7 +3,7 @@ import { videos } from "@db/schema/videos";
 import { eq, and, or, ilike, gte, lte, asc, desc, sql } from "drizzle-orm";
 import AppError from "src/lib/AppError";
 import { CreateVideo, InitiateVideo, UpdateVideo, SearchVideos } from "src/schemas/videoSchemas";
-import { getVideoSignedUrl } from "src/lib/s3";
+import { getVideoSignedUrl, deleteObject, videosBucket } from "src/lib/s3";
 import { users } from "@db/schema";
 
 /**
@@ -49,6 +49,27 @@ export const updateVideo = async (id: string, userId: string, data: UpdateVideo)
 	const [updated] = await db.update(videos).set(data).where(eq(videos.id, id)).returning();
 
 	return updated;
+};
+
+export const deleteVideo = async (id: string, userId: string) => {
+	const video = await db.query.videos.findFirst({
+		where: (t, { eq }) => eq(t.id, id),
+	});
+
+	if (!video) throw new AppError("Video not found", 404);
+	if (video.userId !== userId) throw new AppError("You do not own this video", 403);
+
+	// Delete from database first
+	await db.delete(videos).where(eq(videos.id, id));
+
+	// Delete from S3 (best effort - don't fail if S3 delete fails)
+	try {
+		await deleteObject(videosBucket, video.video);
+	} catch (err) {
+		console.error("Failed to delete video from S3:", err);
+	}
+
+	return { message: "Video deleted successfully" };
 };
 
 export const listUserVideos = async (userId: string) => {

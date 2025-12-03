@@ -1,0 +1,1341 @@
+openapi: 3.0.3
+info:
+  title: Integrador_YT2 API
+  description: |
+    Video sharing platform REST API with user authentication, video uploads, 
+    comments, and likes functionality. Features presigned S3 uploads and 
+    asynchronous video transcoding.
+  version: 1.0.0
+  contact:
+    name: API Support
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+  - url: https://api.example.com/api
+    description: Production server
+
+tags:
+  - name: Users
+    description: User account management and authentication
+  - name: Videos
+    description: Video upload, retrieval, and management
+  - name: Comments
+    description: Video comments operations
+  - name: Likes
+    description: Video likes and dislikes
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ==================== USERS ====================
+  /users:
+    post:
+      tags:
+        - Users
+      summary: Create a new user account
+      description: Register a new user with email and password
+      operationId: createUser
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  example: John Doe
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                password:
+                  type: string
+                  minLength: 8
+                  format: password
+                  example: securepassword123
+      responses:
+        "201":
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/signin:
+    post:
+      tags:
+        - Users
+      summary: Sign in to get authentication token
+      description: Authenticate user and receive JWT token
+      operationId: signIn
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: john@example.com
+                password:
+                  type: string
+                  format: password
+                  example: securepassword123
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+                  token:
+                    type: string
+                    description: JWT authentication token
+                    example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /users/me:
+    get:
+      tags:
+        - Users
+      summary: Get current user profile
+      description: Retrieve the authenticated user's profile information
+      operationId: getMe
+      responses:
+        "200":
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      tags:
+        - Users
+      summary: Update current user profile
+      description: Update the authenticated user's profile information
+      operationId: updateMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  example: John Smith
+                email:
+                  type: string
+                  format: email
+                  example: john.smith@example.com
+                password:
+                  type: string
+                  minLength: 8
+                  format: password
+                oldPassword:
+                  type: string
+                  description: Required when changing password
+                  example: oldpassword123
+      responses:
+        "200":
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Email already in use
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/me/photo:
+    post:
+      tags:
+        - Users
+      summary: Upload profile photo
+      description: Upload a profile photo (JPEG, PNG, or GIF, max 5MB)
+      operationId: uploadPhoto
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - photo
+              properties:
+                photo:
+                  type: string
+                  format: binary
+                  description: Image file (JPEG, PNG, GIF, max 5MB)
+      responses:
+        "200":
+          description: Photo uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: No file uploaded or invalid file type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: File too large (max 5MB)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags:
+        - Users
+      summary: Remove profile photo
+      description: Delete the authenticated user's profile photo
+      operationId: removePhoto
+      responses:
+        "200":
+          description: Photo removed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ==================== VIDEOS ====================
+  /videos:
+    get:
+      tags:
+        - Videos
+      summary: Search and list videos
+      description: Search videos with filters, sorting, and pagination
+      operationId: searchVideos
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - name: q
+          in: query
+          description: Search query for title/description
+          schema:
+            type: string
+            example: tutorial
+        - name: uploaderName
+          in: query
+          description: Filter by uploader name
+          schema:
+            type: string
+        - name: minLength
+          in: query
+          description: Minimum video length in seconds
+          schema:
+            type: integer
+            minimum: 0
+        - name: maxLength
+          in: query
+          description: Maximum video length in seconds
+          schema:
+            type: integer
+            minimum: 0
+        - name: sortBy
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [date, likes, length, title]
+            default: date
+        - name: sortOrder
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          description: Results per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Videos retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  videos:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VideoWithOwner"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /videos/initiate:
+    post:
+      tags:
+        - Videos
+      summary: Initiate video upload
+      description: Start a presigned video upload process and get S3 upload URL
+      operationId: initiateUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - description
+                - filename
+                - contentType
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  example: My Tutorial Video
+                description:
+                  type: string
+                  minLength: 1
+                  example: Learn how to build amazing things
+                visibility:
+                  $ref: "#/components/schemas/Visibility"
+                filename:
+                  type: string
+                  minLength: 1
+                  example: tutorial.mp4
+                contentType:
+                  type: string
+                  minLength: 1
+                  example: video/mp4
+      responses:
+        "200":
+          description: Upload initiated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                    description: Upload key for completion
+                    example: uploads/550e8400-e29b-41d4-a716-446655440000/123e4567.mp4
+                  upload:
+                    type: object
+                    description: S3 presigned POST data
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+                        example: https://s3.amazonaws.com/bucket
+                      fields:
+                        type: object
+                        additionalProperties:
+                          type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          description: Too many concurrent uploads
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /videos/complete:
+    post:
+      tags:
+        - Videos
+      summary: Complete video upload
+      description: Finalize upload and queue for transcoding
+      operationId: completeUpload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - key
+              properties:
+                key:
+                  type: string
+                  description: Upload key from initiate response
+                  example: uploads/550e8400-e29b-41d4-a716-446655440000/123e4567.mp4
+                title:
+                  type: string
+                  minLength: 1
+                  description: Optional title override
+                description:
+                  type: string
+                  minLength: 1
+                  description: Optional description override
+                visibility:
+                  $ref: "#/components/schemas/Visibility"
+      responses:
+        "202":
+          description: Upload accepted and queued for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Upload received; processing queued
+                  key:
+                    type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /videos/pending:
+    get:
+      tags:
+        - Videos
+      summary: Get user's pending uploads
+      description: Retrieve all pending/processing uploads for authenticated user
+      operationId: getUserPendingJobs
+      responses:
+        "200":
+          description: Pending uploads retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PendingUpload"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /videos/{id}:
+    get:
+      tags:
+        - Videos
+      summary: Get video by ID
+      description: Retrieve a specific video's details
+      operationId: getVideo
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200":
+          description: Video retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoWithOwner"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+            delete:
+              tags:
+                - Videos
+              summary: Delete video
+              description: Permanently delete a video (owner only)
+              operationId: deleteVideo
+              parameters:
+                - $ref: "#/components/parameters/VideoId"
+              responses:
+                "200":
+                  description: Video deleted successfully
+                  content:
+                    application/json:
+                      schema:
+                        type: object
+                        properties:
+                          message:
+                            type: string
+                            example: Video deleted successfully
+                "401":
+                  $ref: "#/components/responses/Unauthorized"
+                "403":
+                  $ref: "#/components/responses/Forbidden"
+                "404":
+                  $ref: "#/components/responses/NotFound"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      tags:
+        - Videos
+      summary: Update video
+      description: Update video metadata (owner only)
+      operationId: updateVideo
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                description:
+                  type: string
+                  minLength: 1
+                visibility:
+                  $ref: "#/components/schemas/Visibility"
+      responses:
+        "200":
+          description: Video updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Video"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /videos/{id}/stream:
+    get:
+      tags:
+        - Videos
+      summary: Get video stream URL
+      description: Get presigned URL to stream the video
+      operationId: streamVideo
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200":
+          description: Stream URL retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+                    description: Presigned S3 URL (time-limited)
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /videos/user/{userId}:
+    get:
+      tags:
+        - Videos
+      summary: Get user's videos
+      description: Retrieve all videos from a specific user
+      operationId: getUserVideos
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: User UUID
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: User videos retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  videos:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Video"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /videos/jobs/next:
+    get:
+      tags:
+        - Videos
+      summary: Get next transcoding job (Transcoder only)
+      description: Internal endpoint for transcoder service
+      operationId: getNextJob
+      security:
+        - TranscoderAuth: []
+      responses:
+        "200":
+          description: Next job or null
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/TranscodeJob"
+                  - type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /videos/jobs/complete:
+    post:
+      tags:
+        - Videos
+      summary: Complete transcoding job (Transcoder only)
+      description: Mark a transcoding job as complete
+      operationId: completeJob
+      security:
+        - TranscoderAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - jobId
+                - finalKey
+              properties:
+                jobId:
+                  type: integer
+                finalKey:
+                  type: string
+                durationSec:
+                  type: number
+                  nullable: true
+                width:
+                  type: integer
+                  nullable: true
+                height:
+                  type: integer
+                  nullable: true
+      responses:
+        "200":
+          description: Job completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  video:
+                    $ref: "#/components/schemas/Video"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /videos/jobs/fail:
+    post:
+      tags:
+        - Videos
+      summary: Fail transcoding job (Transcoder only)
+      description: Mark a transcoding job as failed
+      operationId: failJob
+      security:
+        - TranscoderAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - jobId
+              properties:
+                jobId:
+                  type: integer
+                error:
+                  type: string
+      responses:
+        "200":
+          description: Job marked as failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ==================== COMMENTS ====================
+  /comments/{videoId}:
+    post:
+      tags:
+        - Comments
+      summary: Create comment
+      description: Post a comment on a video
+      operationId: createComment
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+                  example: Great video! Very helpful tutorial.
+      responses:
+        "201":
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentWithUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    get:
+      tags:
+        - Comments
+      summary: Get video comments
+      description: Retrieve all comments for a video with pagination
+      operationId: getVideoComments
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Comments retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CommentWithUser"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /comments/{videoId}/count:
+    get:
+      tags:
+        - Comments
+      summary: Get comment count
+      description: Get total number of comments on a video
+      operationId: getCommentCount
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200":
+          description: Count retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    example: 42
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /comments/comment/{commentId}:
+    get:
+      tags:
+        - Comments
+      summary: Get single comment
+      description: Retrieve a specific comment by ID
+      operationId: getComment
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/CommentId"
+      responses:
+        "200":
+          description: Comment retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentWithUser"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      tags:
+        - Comments
+      summary: Update comment
+      description: Update a comment (owner only)
+      operationId: updateComment
+      parameters:
+        - $ref: "#/components/parameters/CommentId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - text
+              properties:
+                text:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+      responses:
+        "200":
+          description: Comment updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags:
+        - Comments
+      summary: Delete comment
+      description: Delete a comment (owner only)
+      operationId: deleteComment
+      parameters:
+        - $ref: "#/components/parameters/CommentId"
+      responses:
+        "200":
+          description: Comment deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Comment deleted successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ==================== LIKES ====================
+  /likes/{videoId}:
+    post:
+      tags:
+        - Likes
+      summary: Toggle like/dislike
+      description: Add or update a like/dislike on a video
+      operationId: toggleLike
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  enum: [like, dislike]
+      responses:
+        "200":
+          description: Like toggled successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Like"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    delete:
+      tags:
+        - Likes
+      summary: Remove like/dislike
+      description: Remove your reaction from a video
+      operationId: removeLike
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200":
+          description: Like removed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Like removed successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /likes/{videoId}/status:
+    get:
+      tags:
+        - Likes
+      summary: Get user's like status
+      description: Check current user's like/dislike status for a video
+      operationId: getUserLikeStatus
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200":
+          description: Status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [like, dislike, none]
+                    example: like
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /likes/{videoId}/counts:
+    get:
+      tags:
+        - Likes
+      summary: Get video like counts
+      description: Get like and dislike counts for a video
+      operationId: getVideoLikeCounts
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200":
+          description: Counts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  likes:
+                    type: integer
+                    example: 1234
+                  dislikes:
+                    type: integer
+                    example: 56
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /users/signin endpoint
+    TranscoderAuth:
+      type: http
+      scheme: bearer
+      description: Special token for transcoder service
+
+  parameters:
+    VideoId:
+      name: videoId
+      in: path
+      required: true
+      description: Video UUID
+      schema:
+        type: string
+        format: uuid
+        example: 550e8400-e29b-41d4-a716-446655440000
+
+    CommentId:
+      name: commentId
+      in: path
+      required: true
+      description: Comment UUID
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        photoUrl:
+          type: string
+          format: uri
+          nullable: true
+          example: https://s3.amazonaws.com/bucket/photos/user.jpg
+
+    Video:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        visibility:
+          $ref: "#/components/schemas/Visibility"
+        likeCount:
+          type: integer
+        dislikeCount:
+          type: integer
+        date:
+          type: string
+          format: date
+        videoLength:
+          type: integer
+          description: Duration in seconds
+        video:
+          type: string
+          description: S3 key
+
+    VideoWithOwner:
+      allOf:
+        - $ref: "#/components/schemas/Video"
+        - type: object
+          properties:
+            owner:
+              $ref: "#/components/schemas/User"
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        videoId:
+          type: string
+          format: uuid
+        text:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        date:
+          type: string
+          format: date
+
+    CommentWithUser:
+      allOf:
+        - $ref: "#/components/schemas/Comment"
+        - type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/User"
+
+    Like:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        videoId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [like, dislike]
+
+    PendingUpload:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+          format: uuid
+        key:
+          type: string
+        filename:
+          type: string
+          nullable: true
+        contentType:
+          type: string
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        visibility:
+          allOf:
+            - $ref: "#/components/schemas/Visibility"
+            - nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [initiated, uploaded, processing, done, failed]
+
+    TranscodeJob:
+      type: object
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+        userId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        visibility:
+          allOf:
+            - $ref: "#/components/schemas/Visibility"
+            - nullable: true
+
+    Visibility:
+      type: string
+      enum: [hidden, link-only, public]
+      default: public
+      description: |
+        - `public`: Visible to everyone, listed in search
+        - `link-only`: Hidden from search, accessible via direct link
+        - `hidden`: Private, only accessible to owner
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        totalResults:
+          type: integer
+        totalPages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          example: An error occurred
+        code:
+          type: integer
+          example: 400
+
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Validation error
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: array
+                items:
+                  type: string
+              message:
+                type: string
+
+  responses:
+    BadRequest:
+      description: Bad request - Invalid input
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/Error"
+              - $ref: "#/components/schemas/ValidationError"
+
+    Unauthorized:
+      description: Unauthorized - Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            message: Unauthorized
+            code: 401
+
+    Forbidden:
+      description: Forbidden - Not authorized to access this resource
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            message: Forbidden
+            code: 403
+
+    NotFound:
+      description: Not found - Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            message: Not found
+            code: 404

@@ -1,58 +1,76 @@
 import { Router } from "express";
 import * as videoController from "../controllers/video.controller";
 import { validate } from "src/middlewares/validate";
-import {
-	updateVideo,
-	initiateVideo,
-	completeVideo,
-	processedWebhook,
-} from "src/schemas/videoSchemas";
+import { updateVideo, initiateVideo, completeVideo, searchVideos } from "src/schemas/videoSchemas";
 import { auth } from "src/middlewares/auth";
 import { transcoderAuth } from "src/middlewares/transcoderAuth";
+import z from "zod";
 
 const router = Router();
 
-// Presigned upload flow
+// Search/list videos with filters and pagination
+router.get("/", auth(true), validate({ querySchema: searchVideos }), videoController.searchVideos);
+
+// Initiate video upload
 router.post(
 	"/initiate",
-	auth,
+	auth(),
 	validate({ bodySchema: initiateVideo }),
 	videoController.initiateUpload,
 );
 
+// Complete video upload
 router.post(
 	"/complete",
-	auth,
+	auth(),
 	validate({ bodySchema: completeVideo }),
 	videoController.completeUpload,
 );
 
-router.get("/:id", videoController.getVideo);
-
-// List videos owned by a given user
-router.get("/user/:userId", videoController.getUserVideos);
-
-// Get a presigned streaming URL for a video stored in S3
-router.get("/:id/stream", videoController.streamVideo);
-
-router.put("/:id", auth, validate({ bodySchema: updateVideo }), videoController.updateVideo);
-
-// Webhook to finalize processed videos (called by transcoder)
-router.post(
-	"/processed",
-	transcoderAuth,
-	validate({ bodySchema: processedWebhook }),
-	videoController.processedWebhook,
+// Get video by ID
+router.get(
+	"/:id",
+	auth(true),
+	validate({
+		querySchema: z.object({
+			id: z.uuid(),
+		}),
+	}),
+	videoController.getVideo,
 );
 
-// Simple job feed for transcoder polling
-router.get("/jobs/pending", transcoderAuth, videoController.getPendingJobs);
+// Update video details
+router.put(
+	"/:id",
+	auth(),
+	validate({ bodySchema: updateVideo, querySchema: z.object({ id: z.uuid() }) }),
+	videoController.updateVideo,
+);
 
-// Claim a job (mark as processing) and mark failed
-router.post("/jobs/claim", transcoderAuth, videoController.claimJob);
-router.post("/jobs/failed", transcoderAuth, videoController.markJobFailed);
+// Get video stream URL
+router.get(
+	"/:id/stream",
+	auth(true),
+	validate({ paramsSchema: z.object({ id: z.uuid() }) }),
+	videoController.streamVideo,
+);
 
-// List pending upload jobs for the authenticated user
-router.get("/pending", auth, videoController.getUserPendingJobs);
+// Get videos from a specific user
+router.get(
+	"/user/:userId",
+	auth(true),
+	validate({ querySchema: z.object({ userId: z.string() }) }),
+	videoController.getUserVideos,
+);
+
+// User pending uploads
+router.get("/pending", auth(), videoController.getUserPendingJobs);
+
+// Routes for transcoder service
+router.get("/jobs/next", transcoderAuth, videoController.getNextJob);
+
+router.post("/jobs/complete", transcoderAuth, videoController.completeJob);
+
+router.post("/jobs/fail", transcoderAuth, videoController.failJob);
 
 export default router;

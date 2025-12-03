@@ -23,7 +23,6 @@ export const completeVideo = z.object({
 	title: z.string().min(1).optional(),
 	description: z.string().min(1).optional(),
 	visibility: z.enum(["hidden", "link-only", "public"]).optional(),
-	videoLength: z.number().int().min(0).optional(),
 });
 export type CompleteVideo = z.infer<typeof completeVideo>;
 
@@ -32,7 +31,6 @@ export const updateVideo = z
 		title: z.string().min(1).optional(),
 		description: z.string().min(1).optional(),
 		visibility: z.enum(["hidden", "link-only", "public"]).optional(),
-		videoLength: z.number().min(1).optional(),
 	})
 	.strict();
 export type UpdateVideo = z.infer<typeof updateVideo>;
@@ -56,3 +54,16 @@ export const processedWebhook = z
 	})
 	.strict();
 export type ProcessedWebhook = z.infer<typeof processedWebhook>;
+
+// Video search/list with filters and pagination
+export const searchVideos = z.object({
+	q: z.string().optional(), // Search query for title/description
+	uploaderName: z.string().optional(), // Filter by uploader name
+	minLength: z.coerce.number().int().min(0).optional(), // Min video length in seconds
+	maxLength: z.coerce.number().int().min(0).optional(), // Max video length in seconds
+	sortBy: z.enum(["date", "likes", "length", "title"]).optional().default("date"),
+	sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+	page: z.coerce.number().int().min(1).optional().default(1),
+	pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
+});
+export type SearchVideos = z.infer<typeof searchVideos>;

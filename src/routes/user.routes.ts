@@ -14,11 +14,11 @@ router.post(
 	userController.createUser,
 );
 
-router.get("/me", auth, userController.getMe);
+router.get("/me", auth(), userController.getMe);
 
 router.put(
 	"/me",
-	auth,
+	auth(),
 	validate({
 		bodySchema: updateUser,
 	}),

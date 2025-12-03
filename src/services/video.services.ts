@@ -1,34 +1,30 @@
 import db from "@db/index";
 import { videos } from "@db/schema/videos";
-import { eq } from "drizzle-orm";
+import { eq, and, or, ilike, gte, lte, asc, desc, sql } from "drizzle-orm";
 import AppError from "src/lib/AppError";
-import { CreateVideo, InitiateVideo, UpdateVideo } from "src/schemas/videoSchemas";
+import { CreateVideo, InitiateVideo, UpdateVideo, SearchVideos } from "src/schemas/videoSchemas";
 import { getVideoSignedUrl } from "src/lib/s3";
+import { users } from "@db/schema";
 
-// export const createVideo = async (userId: string, data: CreateVideo, filePath: string) => {
-// 	if (!filePath) throw new AppError("Video file is required", 400);
-
-// 	const [video] = await db
-// 		.insert(videos)
-// 		.values({
-// 			userId,
-// 			title: data.title,
-// 			description: data.description,
-// 			visibility: data.visibility,
-// 			videoLength: data.videoLength,
-// 			video: filePath,
-// 		})
-// 		.returning();
-
-// 	return video;
-// };
-
-export const getVideo = async (id: string) => {
+/**
+ * Get a video by ID with access control.
+ * - Public videos are accessible to everyone.
+ * - Link-only videos are accessible to everyone who has the link.
+ * - Hidden videos are only accessible to the owner.
+ */
+export const getVideo = async (id: string, requesterId?: string) => {
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, id),
 	});
 
 	if (!video) throw new AppError("Video not found", 404);
+
+	// Access control: hidden videos require ownership
+	if (video.visibility === "hidden") {
+		if (!requesterId || video.userId !== requesterId) {
+			throw new AppError("Video not found", 404);
+		}
+	}
 
 	return video;
 };
@@ -89,12 +85,25 @@ export const listUserVideosForRequester = async (
 	});
 };
 
-export const getVideoStreamUrl = async (id: string) => {
+/**
+ * Get a streaming URL for a video with access control.
+ * - Public videos are accessible to everyone.
+ * - Link-only videos are accessible to everyone who has the link.
+ * - Hidden videos are only accessible to the owner.
+ */
+export const getVideoStreamUrl = async (id: string, requesterId?: string) => {
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, id),
 	});
 
 	if (!video) throw new AppError("Video not found", 404);
+
+	// Access control: hidden videos require ownership
+	if (video.visibility === "hidden") {
+		if (!requesterId || video.userId !== requesterId) {
+			throw new AppError("Video not found", 404);
+		}
+	}
 
 	const keyOrUrl = video.video;
 	// If storage saved full URL (e.g. `location`), return directly; if key, build signed URL
@@ -130,4 +139,115 @@ export const createVideoFromUpload = async (
 		.returning();
 
 	return video;
+};
+
+/**
+ * Search and filter videos with pagination.
+ * Supports:
+ * - Text search on title/description
+ * - Filter by uploader name
+ * - Filter by video length range
+ * - Sort by date, likes, length, or title
+ * - Pagination
+ *
+ * Only returns public videos (and link-only for direct access).
+ * Hidden videos are excluded from search results.
+ */
+export const searchVideos = async (filters: SearchVideos, requesterId?: string) => {
+	const {
+		q,
+		uploaderName,
+		minLength,
+		maxLength,
+		sortBy = "date",
+		sortOrder = "desc",
+		page = 1,
+		pageSize = 20,
+	} = filters;
+
+	const offset = (page - 1) * pageSize;
+
+	// Build WHERE conditions
+	const conditions = [];
+
+	// Only show public in search
+	conditions.push(eq(videos.visibility, "public"));
+
+	// Text search on title and description
+	if (q) {
+		const searchPattern = `%${q}%`;
+		conditions.push(
+			or(ilike(videos.title, searchPattern), ilike(videos.description, searchPattern)),
+		);
+	}
+
+	// Video length filters
+	if (minLength !== undefined) {
+		conditions.push(gte(videos.videoLength, minLength));
+	}
+	if (maxLength !== undefined) {
+		conditions.push(lte(videos.videoLength, maxLength));
+	}
+
+	// Build the base query with join to users for uploader name filter
+	let query = db
+		.select({
+			id: videos.id,
+			userId: videos.userId,
+			title: videos.title,
+			description: videos.description,
+			visibility: videos.visibility,
+			likeCount: videos.likeCount,
+			dislikeCount: videos.dislikeCount,
+			date: videos.date,
+			videoLength: videos.videoLength,
+			video: videos.video,
+			uploaderName: users.name,
+		})
+		.from(videos)
+		.innerJoin(users, eq(videos.userId, users.id));
+
+	// Apply uploader name filter
+	if (uploaderName) {
+		conditions.push(ilike(users.name, `%${uploaderName}%`));
+	}
+
+	// Apply all conditions
+	if (conditions.length > 0) {
+		query = query.where(and(...conditions)) as any;
+	}
+
+	// Apply sorting
+	const sortColumn = {
+		date: videos.date,
+		likes: videos.likeCount,
+		length: videos.videoLength,
+		title: videos.title,
+	}[sortBy];
+
+	const sortFn = sortOrder === "asc" ? asc : desc;
+	query = query.orderBy(sortFn(sortColumn)) as any;
+
+	// Apply pagination
+	query = query.limit(pageSize).offset(offset) as any;
+
+	const results = await query;
+
+	// Get total count for pagination metadata
+	const countConditions = conditions.length > 0 ? and(...conditions) : undefined;
+	const [{ count }] = await db
+		.select({ count: sql<number>`count(*)::int` })
+		.from(videos)
+		.innerJoin(users, eq(videos.userId, users.id))
+		.where(countConditions);
+
+	return {
+		videos: results,
+		pagination: {
+			page,
+			pageSize,
+			totalCount: count,
+			totalPages: Math.ceil(count / pageSize),
+		},
+	};
 };

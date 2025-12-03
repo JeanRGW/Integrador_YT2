@@ -27,13 +27,14 @@ const s3 = new S3Client({
 	credentials: { accessKeyId: S3_ACCESS_KEY!, secretAccessKey: S3_SECRET_KEY! },
 });
 
-async function fetchPending(limit = 3) {
-	const url = `${API_BASE_URL}/videos/jobs/pending?limit=${limit}`;
+async function fetchNextJob() {
+	const url = `${API_BASE_URL}/videos/jobs/next`;
 	const res = await fetch(url, {
 		method: "GET",
 		headers: { "X-Transcoder-Secret": TRANSCODER_SECRET! },
 	});
-	if (!res.ok) throw new Error(`Failed to fetch pending jobs: ${res.status}`);
+	if (res.status === 204) return null; // No jobs available
+	if (!res.ok) throw new Error(`Failed to fetch next job: ${res.status}`);
 	return res.json();
 }
 
@@ -65,7 +66,7 @@ async function transcode(inputPath: string) {
 		"-preset",
 		"fast",
 		"-crf",
-		"26",
+		"28",
 		"-c:a",
 		"aac",
 		"-b:a",
@@ -124,48 +125,68 @@ async function uploadFinal(userId: string, outputPath: string) {
 	return key;
 }
 
-async function finalize(pendingKey: string, finalKey: string, meta: any, userId?: string) {
-	const body = { pendingKey, finalKey, meta, userId };
-	const res = await fetch(`${API_BASE_URL}/videos/processed`, {
+async function completeJob(key: string, finalKey: string, meta: any) {
+	const body = { key, finalKey, meta };
+	const res = await fetch(`${API_BASE_URL}/videos/jobs/complete`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json", "X-Transcoder-Secret": TRANSCODER_SECRET! },
 		body: JSON.stringify(body),
 	});
-	if (!res.ok) throw new Error(`Webhook failed: ${res.status}`);
+	if (!res.ok) throw new Error(`Complete job failed: ${res.status}`);
+	return res.json();
+}
+
+async function failJob(key: string, reason: string) {
+	const body = { key, reason };
+	const res = await fetch(`${API_BASE_URL}/videos/jobs/fail`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json", "X-Transcoder-Secret": TRANSCODER_SECRET! },
+		body: JSON.stringify(body),
+	});
+	if (!res.ok) throw new Error(`Fail job failed: ${res.status}`);
 	return res.json();
 }
 
 async function processJob(job: any) {
 	console.log("Processing job", job.key);
-	const input = await downloadRaw(job.key);
-	const output = await transcode(input);
-	const finalKey = await uploadFinal(job.userId, output);
-	const meta = await probeMeta(output);
-	await finalize(job.key, finalKey, meta, job.userId);
 	try {
-		await fs.unlink(input);
+		const input = await downloadRaw(job.key);
+		const output = await transcode(input);
+		const finalKey = await uploadFinal(job.userId, output);
+		const meta = await probeMeta(output);
+		await completeJob(job.key, finalKey, meta);
+		try {
+			await fs.unlink(input);
+		} catch (err) {
+			console.error(`Failed to delete input file ${input}:`, err);
+		}
+		try {
+			await fs.unlink(output);
+		} catch (err) {
+			console.error(`Failed to delete output file ${output}:`, err);
+		}
+		console.log("Finished job", job.key);
 	} catch (err) {
-		console.error(`Failed to delete input file ${input}:`, err);
+		console.error("Job processing error", err);
+		await failJob(job.key, err instanceof Error ? err.message : String(err));
+		throw err;
 	}
-	try {
-		await fs.unlink(output);
-	} catch (err) {
-		console.error(`Failed to delete output file ${output}:`, err);
-	}
-	console.log("Finished job", job.key);
 }
 
 async function loop() {
 	while (true) {
 		try {
-			const jobs = await fetchPending(2);
-			for (const job of jobs) {
+			const job = await fetchNextJob();
+			if (job) {
 				await processJob(job);
+			} else {
+				// No jobs available, wait before polling again
+				await new Promise((r) => setTimeout(r, 5000));
 			}
 		} catch (err) {
 			console.error("Loop error", err);
+			await new Promise((r) => setTimeout(r, 5000));
 		}
-		await new Promise((r) => setTimeout(r, 5000));
 	}
 }
 

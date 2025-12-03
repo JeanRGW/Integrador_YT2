@@ -20,6 +20,8 @@ import apiRouter from "./routes/index";
 
 const app = express();
 
+app.use("/public", express.static("public"));
+
 // Enable CORS for browser clients
 app.use(cors());
 app.use(express.json());

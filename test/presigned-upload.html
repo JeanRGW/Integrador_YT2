@@ -8,6 +8,7 @@
 			body {
 				font-family: system-ui, sans-serif;
 				margin: 2rem;
+				max-width: 900px;
 			}
 			fieldset {
 				margin-bottom: 1rem;
@@ -19,16 +20,122 @@
 				margin: 0.25rem 0;
 				width: 100%;
 			}
+			button {
+				cursor: pointer;
+				background: #0969da;
+				color: white;
+				border: none;
+				border-radius: 6px;
+				font-weight: 500;
+				transition: background 0.2s;
+			}
+			button:hover:not(:disabled) {
+				background: #0860ca;
+			}
+			button:disabled {
+				background: #94a3b8;
+				cursor: not-allowed;
+			}
+			button.loading {
+				position: relative;
+				color: transparent;
+			}
+			button.loading::after {
+				content: "";
+				position: absolute;
+				width: 16px;
+				height: 16px;
+				top: 50%;
+				left: 50%;
+				margin-left: -8px;
+				margin-top: -8px;
+				border: 2px solid #ffffff;
+				border-radius: 50%;
+				border-top-color: transparent;
+				animation: spin 0.6s linear infinite;
+			}
+			@keyframes spin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
 			.row {
 				display: grid;
 				grid-template-columns: 1fr 1fr;
 				gap: 1rem;
+			}
+			.progress-container {
+				margin: 1rem 0;
+				display: none;
+			}
+			.progress-container.active {
+				display: block;
+			}
+			.progress-bar {
+				width: 100%;
+				height: 24px;
+				background: #e5e7eb;
+				border-radius: 12px;
+				overflow: hidden;
+				position: relative;
+			}
+			.progress-fill {
+				height: 100%;
+				background: linear-gradient(90deg, #0969da, #54aeff);
+				transition: width 0.3s ease;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				color: white;
+				font-size: 12px;
+				font-weight: 600;
+			}
+			.progress-text {
+				margin-top: 0.5rem;
+				font-size: 14px;
+				color: #666;
+			}
+			.status-badge {
+				display: inline-block;
+				padding: 0.25rem 0.75rem;
+				border-radius: 12px;
+				font-size: 12px;
+				font-weight: 500;
+				margin: 0.5rem 0;
+			}
+			.status-success {
+				background: #d1fae5;
+				color: #065f46;
+			}
+			.status-error {
+				background: #fee2e2;
+				color: #991b1b;
+			}
+			.status-info {
+				background: #dbeafe;
+				color: #1e40af;
 			}
 			.log {
 				white-space: pre-wrap;
 				background: #f6f8fa;
 				padding: 1rem;
 				border: 1px solid #ddd;
+				border-radius: 6px;
+				max-height: 400px;
+				overflow-y: auto;
+				font-size: 13px;
+				font-family: "Consolas", "Monaco", monospace;
+			}
+			.file-info {
+				margin-top: 0.5rem;
+				padding: 0.5rem;
+				background: #f8fafc;
+				border-radius: 4px;
+				font-size: 14px;
+				display: none;
+			}
+			.file-info.active {
+				display: block;
 			}
 		</style>
 	</head>
@@ -70,7 +177,17 @@
 				Video File
 				<input id="file" type="file" accept="video/*" />
 			</label>
+			<div id="file-info" class="file-info"></div>
 		</fieldset>
+
+		<div class="progress-container" id="progress-container">
+			<div class="progress-bar">
+				<div class="progress-fill" id="progress-fill">0%</div>
+			</div>
+			<div class="progress-text" id="progress-text">Preparing upload...</div>
+		</div>
+
+		<div id="status-container"></div>
 
 		<div class="row">
 			<button id="btn-initiate">1) Initiate Upload</button>
@@ -95,7 +212,53 @@
 				const out = obj ? `${msg}:\n${JSON.stringify(obj, null, 2)}` : msg;
 				const el = $("log");
 				el.textContent = `${el.textContent}\n\n${out}`.trim();
+				el.scrollTop = el.scrollHeight;
 			};
+
+			const showProgress = (visible) => {
+				$("progress-container").classList.toggle("active", visible);
+			};
+
+			const updateProgress = (percent, text) => {
+				const fill = $("progress-fill");
+				fill.style.width = `${percent}%`;
+				fill.textContent = `${Math.round(percent)}%`;
+				$("progress-text").textContent = text;
+			};
+
+			const showStatus = (message, type = "info") => {
+				const badge = document.createElement("div");
+				badge.className = `status-badge status-${type}`;
+				badge.textContent = message;
+				const container = $("status-container");
+				container.innerHTML = "";
+				container.appendChild(badge);
+			};
+
+			const setButtonLoading = (btnId, loading) => {
+				const btn = $(btnId);
+				btn.disabled = loading;
+				btn.classList.toggle("loading", loading);
+			};
+
+			const formatFileSize = (bytes) => {
+				if (bytes < 1024) return bytes + " B";
+				if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+				if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+				return (bytes / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+			};
+
+			$("file").addEventListener("change", (e) => {
+				const file = e.target.files[0];
+				if (file) {
+					const info = $("file-info");
+					info.classList.add("active");
+					info.innerHTML = `
+						<strong>📹 ${file.name}</strong><br>
+						Size: ${formatFileSize(file.size)} | Type: ${file.type || "unknown"}
+					`;
+				}
+			});
 
 			$("btn-reset").onclick = () => {
 				presigned = null;
@@ -105,6 +268,9 @@
 				$("btn-complete").disabled = true;
 				$("log").textContent = "";
 				$("file").value = "";
+				$("file-info").classList.remove("active");
+				showProgress(false);
+				$("status-container").innerHTML = "";
 			};
 
 			$("btn-initiate").onclick = async () => {
@@ -114,6 +280,10 @@
 					if (!token) return alert("Provide JWT token");
 					if (!file) return alert("Choose a video file");
 					lastFile = file;
+
+					setButtonLoading("btn-initiate", true);
+					showProgress(true);
+					updateProgress(10, "Requesting upload URL...");
 
 					const body = {
 						title: $("title").value.trim(),
@@ -133,21 +303,31 @@
 						body: JSON.stringify(body),
 					});
 					const data = await res.json();
-					if (!res.ok) throw new Error(data?.msg || res.statusText);
+					if (!res.ok) throw new Error(data?.message || data?.msg || res.statusText);
 
 					// data: { key, upload: { url, fields } }
 					key = data.key;
 					presigned = data.upload;
 					$("btn-upload").disabled = false;
+					updateProgress(25, "Ready to upload!");
+					showStatus("✓ Upload URL obtained", "success");
 					log("Initiate response", data);
 				} catch (e) {
+					showProgress(false);
+					showStatus("✗ Initiation failed: " + e.message, "error");
 					log("Initiate error", { error: String(e) });
+				} finally {
+					setButtonLoading("btn-initiate", false);
 				}
 			};
 
 			$("btn-upload").onclick = async () => {
 				try {
 					if (!presigned || !lastFile) return alert("Run initiate and select a file first");
+
+					setButtonLoading("btn-upload", true);
+					updateProgress(30, "Uploading to storage...");
+
 					const form = new FormData();
 					// Append presigned fields first
 					Object.entries(presigned.fields).forEach(([k, v]) => form.append(k, v));
@@ -158,14 +338,44 @@
 					// Then the file field named "file"
 					form.append("file", lastFile);
 
-					const uploadRes = await fetch(presigned.url, { method: "POST", body: form });
-					if (!uploadRes.ok) throw new Error(`Upload failed: ${uploadRes.status}`);
+					// Use XMLHttpRequest for upload progress tracking
+					await new Promise((resolve, reject) => {
+						const xhr = new XMLHttpRequest();
 
-					$("btn-complete").disabled = true; // enable after short delay or directly
+						xhr.upload.addEventListener("progress", (e) => {
+							if (e.lengthComputable) {
+								const percent = 30 + (e.loaded / e.total) * 50; // 30% to 80%
+								updateProgress(
+									percent,
+									`Uploading: ${formatFileSize(e.loaded)} / ${formatFileSize(e.total)}`,
+								);
+							}
+						});
+
+						xhr.addEventListener("load", () => {
+							if (xhr.status >= 200 && xhr.status < 300) {
+								resolve(xhr.response);
+							} else {
+								reject(new Error(`Upload failed: ${xhr.status}`));
+							}
+						});
+
+						xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
+						xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
+
+						xhr.open("POST", presigned.url);
+						xhr.send(form);
+					});
+
+					updateProgress(80, "Upload complete!");
 					$("btn-complete").disabled = false;
-					log("Upload success (S3/MinIO response)", { status: uploadRes.status });
+					showStatus("✓ File uploaded to storage", "success");
+					log("Upload success (S3/MinIO response)");
 				} catch (e) {
+					showStatus("✗ Upload failed: " + e.message, "error");
 					log("Upload error", { error: String(e) });
+				} finally {
+					setButtonLoading("btn-upload", false);
 				}
 			};
 
@@ -175,12 +385,11 @@
 					if (!token) return alert("Provide JWT token");
 					if (!key) return alert("No key; run initiate first");
 
+					setButtonLoading("btn-complete", true);
+					updateProgress(85, "Finalizing upload...");
+
 					const body = {
 						key,
-						title: $("title").value.trim(),
-						description: $("description").value.trim(),
-						visibility: $("visibility").value,
-						videoLength: 0,
 					};
 
 					const res = await fetch(`${apiBase}/videos/complete`, {
@@ -192,11 +401,21 @@
 						body: JSON.stringify(body),
 					});
 					const data = await res.json();
-					if (!res.ok) throw new Error(data?.msg || res.statusText);
+					if (!res.ok) throw new Error(data?.message || data?.msg || res.statusText);
 
-					log("Complete response (video created)", data);
+					updateProgress(100, "✓ Complete! Video queued for processing");
+					showStatus("✓ Upload complete! Video is being transcoded", "success");
+					log("Complete response (video queued for processing)", data);
+
+					// Disable all buttons after successful completion
+					$("btn-initiate").disabled = true;
+					$("btn-upload").disabled = true;
+					$("btn-complete").disabled = true;
 				} catch (e) {
+					showStatus("✗ Completion failed: " + e.message, "error");
 					log("Complete error", { error: String(e) });
+				} finally {
+					setButtonLoading("btn-complete", false);
 				}
 			};
 		</script>

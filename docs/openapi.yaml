@@ -492,32 +492,32 @@ paths:
                 $ref: "#/components/schemas/VideoWithOwner"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
-            delete:
-              tags:
-                - Videos
-              summary: Delete video
-              description: Permanently delete a video (owner only)
-              operationId: deleteVideo
-              parameters:
-                - $ref: "#/components/parameters/VideoId"
-              responses:
-                "200":
-                  description: Video deleted successfully
-                  content:
-                    application/json:
-                      schema:
-                        type: object
-                        properties:
-                          message:
-                            type: string
-                            example: Video deleted successfully
-                "401":
-                  $ref: "#/components/responses/Unauthorized"
-                "403":
-                  $ref: "#/components/responses/Forbidden"
-                "404":
-                  $ref: "#/components/responses/NotFound"
+    delete:
+      tags:
+        - Videos
+      summary: Delete video
+      description: Permanently delete a video (owner only)
+      operationId: deleteVideo
+      parameters:
+        - $ref: "#/components/parameters/VideoId"
+      responses:
+        "200":
+          description: Video deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Video deleted successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
 

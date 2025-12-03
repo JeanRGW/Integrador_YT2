@@ -3,6 +3,7 @@ import * as userController from "../controllers/user.controller";
 import { validate } from "src/middlewares/validate";
 import { createUser, updateUser, signInUser } from "src/schemas/userSchemas";
 import { auth } from "src/middlewares/auth";
+import uploadPhoto from "src/middlewares/uploadPhoto";
 
 const router = Router();
 
@@ -31,6 +32,17 @@ router.post(
 		bodySchema: signInUser,
 	}),
 	userController.signIn,
+);
+
+// User photo: remove
+router.delete("/me/photo", auth(), userController.removePhoto);
+
+// User photo: direct upload to backend (multipart/form-data with field "photo")
+router.post(
+	"/me/photo",
+	auth(),
+	uploadPhoto.single("photo"),
+	userController.uploadPhotoDirect,
 );
 
 export default router;

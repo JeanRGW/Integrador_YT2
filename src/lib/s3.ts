@@ -16,11 +16,13 @@ const {
 	S3_SECRET_KEY,
 	S3_UPLOADS_BUCKET,
 	S3_VIDEOS_BUCKET,
+	S3_IMAGES_BUCKET,
 } = process.env;
 
 if (!S3_ENDPOINT) throw new Error("S3_ENDPOINT is not defined on environment.");
 if (!S3_UPLOADS_BUCKET) throw new Error("S3_UPLOADS_BUCKET is not defined on environment.");
 if (!S3_VIDEOS_BUCKET) throw new Error("S3_VIDEOS_BUCKET is not defined on environment.");
+if (!S3_IMAGES_BUCKET) throw new Error("S3_IMAGES_BUCKET is not defined on environment.");
 if (!S3_ACCESS_KEY || !S3_SECRET_KEY)
 	throw new Error("S3_ACCESS_KEY/S3_SECRET_KEY not defined on environment.");
 
@@ -36,6 +38,7 @@ export const s3 = new S3Client({
 
 export const uploadsBucket = S3_UPLOADS_BUCKET!;
 export const videosBucket = S3_VIDEOS_BUCKET!;
+export const imagesBucket = S3_IMAGES_BUCKET!;
 
 export const ensureBuckets = async () => {
 	try {
@@ -47,6 +50,11 @@ export const ensureBuckets = async () => {
 		await s3.send(new HeadBucketCommand({ Bucket: videosBucket }));
 	} catch {
 		await s3.send(new CreateBucketCommand({ Bucket: videosBucket }));
+	}
+	try {
+		await s3.send(new HeadBucketCommand({ Bucket: imagesBucket }));
+	} catch {
+		await s3.send(new CreateBucketCommand({ Bucket: imagesBucket }));
 	}
 };
 

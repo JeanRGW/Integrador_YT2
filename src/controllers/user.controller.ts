@@ -38,3 +38,29 @@ export const signIn = async (req: Request, res: Response, next: NextFunction) =>
 		next(err);
 	}
 };
+
+export const removePhoto = async (req: Request, res: Response, next: NextFunction) => {
+	try {
+		const userId = req.user!.id;
+		const result = await userService.removePhoto(userId);
+		return res.json(result);
+	} catch (err) {
+		next(err);
+	}
+};
+
+export const uploadPhotoDirect = async (req: Request, res: Response, next: NextFunction) => {
+	try {
+		const userId = req.user!.id;
+		const file = (req as any).file as Express.Multer.File | undefined;
+		if (!file) return res.status(400).json({ message: "No file uploaded" });
+		const updated = await userService.uploadPhotoDirect(userId, {
+			buffer: file.buffer,
+			originalname: file.originalname,
+			mimetype: file.mimetype,
+		});
+		return res.status(200).json(updated);
+	} catch (err) {
+		next(err);
+	}
+};

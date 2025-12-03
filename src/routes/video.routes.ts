@@ -32,7 +32,7 @@ router.get(
 	"/:id",
 	auth(true),
 	validate({
-		querySchema: z.object({
+		paramsSchema: z.object({
 			id: z.uuid(),
 		}),
 	}),
@@ -43,7 +43,7 @@ router.get(
 router.put(
 	"/:id",
 	auth(),
-	validate({ bodySchema: updateVideo, querySchema: z.object({ id: z.uuid() }) }),
+	validate({ bodySchema: updateVideo, paramsSchema: z.object({ id: z.uuid() }) }),
 	videoController.updateVideo,
 );
 
@@ -59,7 +59,7 @@ router.get(
 router.get(
 	"/user/:userId",
 	auth(true),
-	validate({ querySchema: z.object({ userId: z.string() }) }),
+	validate({ paramsSchema: z.object({ userId: z.uuid() }) }),
 	videoController.getUserVideos,
 );
 

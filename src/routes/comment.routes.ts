@@ -12,7 +12,6 @@ import { auth } from "src/middlewares/auth";
 
 const router = Router();
 
-// Create a comment on a video
 router.post(
 	"/:videoId",
 	auth(),
@@ -20,7 +19,6 @@ router.post(
 	commentController.createComment,
 );
 
-// Get all comments for a video (public endpoint with optional auth)
 router.get(
 	"/:videoId",
 	auth(true),
@@ -28,7 +26,6 @@ router.get(
 	commentController.getVideoComments,
 );
 
-// Get comment count for a video (public endpoint)
 router.get(
 	"/:videoId/count",
 	auth(true),
@@ -36,7 +33,6 @@ router.get(
 	commentController.getCommentCount,
 );
 
-// Get a single comment by ID (public endpoint)
 router.get(
 	"/comment/:commentId",
 	auth(true),
@@ -44,7 +40,6 @@ router.get(
 	commentController.getComment,
 );
 
-// Update a comment (only by owner)
 router.put(
 	"/comment/:commentId",
 	auth(),
@@ -52,7 +47,6 @@ router.put(
 	commentController.updateComment,
 );
 
-// Delete a comment (only by owner)
 router.delete(
 	"/comment/:commentId",
 	auth(),

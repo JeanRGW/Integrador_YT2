@@ -34,10 +34,7 @@ router.post(
 	userController.signIn,
 );
 
-// User photo: remove
 router.delete("/me/photo", auth(), userController.removePhoto);
-
-// User photo: direct upload to backend (multipart/form-data with field "photo")
 router.post(
 	"/me/photo",
 	auth(),

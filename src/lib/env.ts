@@ -21,6 +21,4 @@ export function validateEnv() {
 		const list = missing.map((m) => m.key).join(", ");
 		throw new Error(`Missing required environment variables: ${list}`);
 	}
-
-	// No optional envs currently
 }

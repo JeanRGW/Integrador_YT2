@@ -8,7 +8,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
-import { MIN_VIDEO_UPLOAD_INTERVAL } from "./constants";
+import { MAX_VIDEO_UPLOAD_SIZE, MIN_VIDEO_UPLOAD_INTERVAL } from "./constants";
 
 const {
 	S3_ENDPOINT,
@@ -76,11 +76,10 @@ export const objectExists = async (bucket: string, key: string) => {
 
 export const getPresignedPostForUploads = async (
 	key: string,
-	maxBytes = 2000 * 1024 * 1024,
+	maxBytes = MAX_VIDEO_UPLOAD_SIZE,
 	contentType?: string,
 	expiresSeconds = MIN_VIDEO_UPLOAD_INTERVAL + 300,
 ) => {
-	// Conditions: max size and optional content type enforcement
 	const conditions: any[] = [["content-length-range", 0, maxBytes]];
 	if (contentType) conditions.push(["eq", "$Content-Type", contentType]);
 
@@ -91,7 +90,6 @@ export const getPresignedPostForUploads = async (
 		Expires: expiresSeconds,
 	});
 
-	// presigned.fields + url to be used by client multipart form upload
 	return presigned;
 };
 

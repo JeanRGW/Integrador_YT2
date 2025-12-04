@@ -6,18 +6,13 @@ import { eq, and, desc, asc } from "drizzle-orm";
 import AppError from "src/lib/AppError";
 import { UserJWT } from "src/types/express";
 
-/**
- * Create a comment on a video.
- */
 export const createComment = async (videoId: string, userId: string, text: string) => {
-	// Check if video exists
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, videoId),
 	});
 
 	if (!video) throw new AppError("Video not found", 404);
 
-	// Create the comment
 	const [comment] = await db
 		.insert(videoComments)
 		.values({
@@ -27,7 +22,6 @@ export const createComment = async (videoId: string, userId: string, text: strin
 		})
 		.returning();
 
-	// Fetch the comment with user details
 	const commentWithUser = await db.query.videoComments.findFirst({
 		where: (t, { eq }) => eq(t.id, comment.id),
 		with: {
@@ -44,9 +38,6 @@ export const createComment = async (videoId: string, userId: string, text: strin
 	return commentWithUser;
 };
 
-/**
- * Get all comments for a video with pagination.
- */
 export const getVideoComments = async (
 	videoId: string,
 	options?: { page?: number; pageSize?: number; sortOrder?: "asc" | "desc" },
@@ -55,15 +46,11 @@ export const getVideoComments = async (
 	const pageSize = options?.pageSize && options.pageSize > 0 ? options.pageSize : 20;
 	const sortOrder = options?.sortOrder || "desc";
 	const offset = (page - 1) * pageSize;
-
-	// Check if video exists
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, videoId),
 	});
 
 	if (!video) throw new AppError("Video not found", 404);
-
-	// Fetch comments with user details
 	const comments = await db.query.videoComments.findMany({
 		where: (t, { eq }) => eq(t.videoId, videoId),
 		with: {
@@ -83,9 +70,6 @@ export const getVideoComments = async (
 	return comments;
 };
 
-/**
- * Get a single comment by ID.
- */
 export const getComment = async (commentId: string) => {
 	const comment = await db.query.videoComments.findFirst({
 		where: (t, { eq }) => eq(t.id, commentId),
@@ -105,9 +89,6 @@ export const getComment = async (commentId: string) => {
 	return comment;
 };
 
-/**
- * Update a comment (only by owner).
- */
 export const updateComment = async (commentId: string, userId: string, text: string) => {
 	const comment = await db.query.videoComments.findFirst({
 		where: (t, { eq }) => eq(t.id, commentId),
@@ -115,14 +96,11 @@ export const updateComment = async (commentId: string, userId: string, text: str
 
 	if (!comment) throw new AppError("Comment not found", 404);
 	if (comment.userId !== userId) throw new AppError("You do not own this comment", 403);
-
 	const [updated] = await db
 		.update(videoComments)
 		.set({ text })
 		.where(eq(videoComments.id, commentId))
 		.returning();
-
-	// Fetch updated comment with user details
 	const commentWithUser = await db.query.videoComments.findFirst({
 		where: (t, { eq }) => eq(t.id, updated.id),
 		with: {
@@ -139,9 +117,6 @@ export const updateComment = async (commentId: string, userId: string, text: str
 	return commentWithUser;
 };
 
-/**
- * Delete a comment (only by owner).
- */
 export const deleteComment = async (commentId: string, user: UserJWT) => {
 	const comment = await db.query.videoComments.findFirst({
 		where: (t, { eq }) => eq(t.id, commentId),
@@ -150,15 +125,11 @@ export const deleteComment = async (commentId: string, user: UserJWT) => {
 	if (!comment) throw new AppError("Comment not found", 404);
 	if (comment.userId !== user.id && user.role !== "admin")
 		throw new AppError("You do not own this comment", 403);
-
 	await db.delete(videoComments).where(eq(videoComments.id, commentId));
 
 	return { message: "Comment deleted successfully" };
 };
 
-/**
- * Get comment count for a video.
- */
 export const getCommentCount = async (videoId: string) => {
 	const comments = await db.query.videoComments.findMany({
 		where: (t, { eq }) => eq(t.videoId, videoId),

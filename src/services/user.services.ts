@@ -118,7 +118,6 @@ export const uploadPhotoDirect = async (
 			: "";
 	const key = `photos/${userId}/${uuid}${ext}`;
 
-	// Upload to uploads bucket directly
 	await s3.send(
 		new PutObjectCommand({
 			Bucket: imagesBucket,
@@ -129,7 +128,6 @@ export const uploadPhotoDirect = async (
 		}),
 	);
 
-	// Delete previous photo if different
 	const current = await db.query.users.findFirst({ where: (t, { eq }) => eq(t.id, userId) });
 	if (!current) throw new AppError("User not found", 404);
 	if (current.photoUrl && current.photoUrl !== key) {

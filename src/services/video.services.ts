@@ -2,17 +2,11 @@ import db from "@db/index";
 import { videos } from "@db/schema/videos";
 import { eq, and, or, ilike, gte, lte, asc, desc, sql } from "drizzle-orm";
 import AppError from "src/lib/AppError";
-import { CreateVideo, InitiateVideo, UpdateVideo, SearchVideos } from "src/schemas/videoSchemas";
+import { InitiateVideo, UpdateVideo, SearchVideos } from "src/schemas/videoSchemas";
 import { getVideoSignedUrl, deleteObject, videosBucket } from "src/lib/s3";
 import { users } from "@db/schema";
 import { UserJWT } from "src/types/express";
 
-/**
- * Get a video by ID with access control.
- * - Public videos are accessible to everyone.
- * - Link-only videos are accessible to everyone who has the link.
- * - Hidden videos are only accessible to the owner.
- */
 export const getVideo = async (id: string, requester?: UserJWT) => {
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, id),
@@ -29,7 +23,6 @@ export const getVideo = async (id: string, requester?: UserJWT) => {
 
 	if (!video) throw new AppError("Video not found", 404);
 
-	// Access control: hidden videos require ownership
 	if (video.visibility === "hidden") {
 		if (!requester || (video.userId !== requester.id && requester.role !== "admin")) {
 			throw new AppError("Video not found", 404);
@@ -62,10 +55,7 @@ export const deleteVideo = async (id: string, user: UserJWT) => {
 	if (video.userId !== user.id && user.role !== "admin")
 		throw new AppError("You do not own this video", 403);
 
-	// Delete from database first
 	await db.delete(videos).where(eq(videos.id, id));
-
-	// Delete from S3 (best effort - don't fail if S3 delete fails)
 	try {
 		await deleteObject(videosBucket, video.video);
 	} catch (err) {
@@ -91,17 +81,6 @@ export const listUserVideos = async (userId: string) => {
 	return videosList;
 };
 
-/**
- * Lists videos for a given user, applying access control based on the requester.
- *
- * - If the requester is the owner (`requesterId === targetUserId`), all videos are returned.
- * - If the requester is not the owner (or unauthenticated), only videos with `visibility: "public"` are returned.
- *
- * @param targetUserId - The user whose videos are being listed.
- * @param requesterId - The ID of the user making the request, or undefined if unauthenticated.
- * @param options - Optional pagination options: `page` (1-based) and `pageSize`.
- * @returns A paginated list of videos visible to the requester.
- */
 export const listUserVideosForRequester = async (
 	targetUserId: string,
 	requester?: UserJWT,
@@ -112,7 +91,6 @@ export const listUserVideosForRequester = async (
 	const offset = (page - 1) * pageSize;
 
 	if (requester && (requester.id === targetUserId || requester.role === "admin")) {
-		// Owner: sees all
 		return db.query.videos.findMany({
 			where: (t, { eq }) => eq(t.userId, targetUserId),
 			limit: pageSize,
@@ -128,7 +106,6 @@ export const listUserVideosForRequester = async (
 			},
 		});
 	}
-	// Non-owner: filter by visibility (public only)
 	return db.query.videos.findMany({
 		where: (t, { eq, and }) => and(eq(t.userId, targetUserId), eq(t.visibility, "public")),
 		limit: pageSize,
@@ -145,12 +122,6 @@ export const listUserVideosForRequester = async (
 	});
 };
 
-/**
- * Get a streaming URL for a video with access control.
- * - Public videos are accessible to everyone.
- * - Link-only videos are accessible to everyone who has the link.
- * - Hidden videos are only accessible to the owner.
- */
 export const getVideoStreamUrl = async (id: string, requester?: UserJWT) => {
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, id),
@@ -158,7 +129,6 @@ export const getVideoStreamUrl = async (id: string, requester?: UserJWT) => {
 
 	if (!video) throw new AppError("Video not found", 404);
 
-	// Access control: hidden videos require ownership
 	if (video.visibility === "hidden") {
 		if (!requester || (video.userId !== requester.id && requester.role !== "admin")) {
 			throw new AppError("Video not found", 404);
@@ -166,7 +136,6 @@ export const getVideoStreamUrl = async (id: string, requester?: UserJWT) => {
 	}
 
 	const keyOrUrl = video.video;
-	// If storage saved full URL (e.g. `location`), return directly; if key, build signed URL
 	const isHttp = /^https?:\/\//i.test(keyOrUrl);
 	if (isHttp) return { url: keyOrUrl };
 
@@ -201,18 +170,6 @@ export const createVideoFromUpload = async (
 	return video;
 };
 
-/**
- * Search and filter videos with pagination.
- * Supports:
- * - Text search on title/description
- * - Filter by uploader name
- * - Filter by video length range
- * - Sort by date, likes, length, or title
- * - Pagination
- *
- * Only returns public videos (and link-only for direct access).
- * Hidden videos are excluded from search results.
- */
 export const searchVideos = async (filters: SearchVideos) => {
 	const {
 		q,
@@ -227,13 +184,8 @@ export const searchVideos = async (filters: SearchVideos) => {
 
 	const offset = (page - 1) * pageSize;
 
-	// Build WHERE conditions
 	const conditions = [];
-
-	// Only show public in search
 	conditions.push(eq(videos.visibility, "public"));
-
-	// Text search on title and description
 	if (q) {
 		const searchPattern = `%${q}%`;
 		conditions.push(
@@ -241,7 +193,6 @@ export const searchVideos = async (filters: SearchVideos) => {
 		);
 	}
 
-	// Video length filters
 	if (minLength !== undefined) {
 		conditions.push(gte(videos.videoLength, minLength));
 	}
@@ -249,7 +200,6 @@ export const searchVideos = async (filters: SearchVideos) => {
 		conditions.push(lte(videos.videoLength, maxLength));
 	}
 
-	// Build the base query with join to users for uploader name filter
 	let query = db
 		.select({
 			id: videos.id,
@@ -268,17 +218,14 @@ export const searchVideos = async (filters: SearchVideos) => {
 		.from(videos)
 		.innerJoin(users, eq(videos.userId, users.id));
 
-	// Apply uploader name filter
 	if (uploaderName) {
 		conditions.push(ilike(users.name, `%${uploaderName}%`));
 	}
 
-	// Apply all conditions
 	if (conditions.length > 0) {
 		query = query.where(and(...conditions)) as any;
 	}
 
-	// Apply sorting
 	const sortColumn = {
 		date: videos.date,
 		likes: videos.likeCount,
@@ -289,12 +236,10 @@ export const searchVideos = async (filters: SearchVideos) => {
 	const sortFn = sortOrder === "asc" ? asc : desc;
 	query = query.orderBy(sortFn(sortColumn)) as any;
 
-	// Apply pagination
 	query = query.limit(pageSize).offset(offset) as any;
 
 	const results = await query;
 
-	// Get total count for pagination metadata
 	const countConditions = conditions.length > 0 ? and(...conditions) : undefined;
 	const [{ count }] = await db
 		.select({ count: sql<number>`count(*)::int` })

@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { pendingUploads, videos } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { SearchVideos } from "src/schemas/videoSchemas";
-import { MIN_VIDEO_UPLOAD_INTERVAL } from "src/lib/constants";
+import { MAX_VIDEO_UPLOAD_SIZE, MIN_VIDEO_UPLOAD_INTERVAL } from "src/lib/constants";
 
 export const searchVideos = async (req: Request, res: Response, next: NextFunction) => {
 	try {
@@ -46,7 +46,7 @@ export const initiateUpload = async (req: Request, res: Response, next: NextFunc
 		const key = `uploads/${userId}/${uuid}${ext}`;
 		const presigned = await getPresignedPostForUploads(
 			key,
-			2000 * 1024 * 1024,
+			MAX_VIDEO_UPLOAD_SIZE,
 			contentType,
 			MIN_VIDEO_UPLOAD_INTERVAL / 1000 + 300,
 		);
@@ -77,7 +77,6 @@ export const completeUpload = async (req: Request, res: Response, next: NextFunc
 		const exists = await objectExists(uploadsBucket, key);
 		if (!exists) throw new AppError("Uploaded file not found", 400);
 
-		// Mark pending upload as uploaded; transcoder will process and finalize
 		const [pending] = await db
 			.update(pendingUploads)
 			.set({ status: "uploaded" })
@@ -182,12 +181,10 @@ export const completeJob = async (req: Request, res: Response, next: NextFunctio
 		const { key, finalKey, meta } = req.body as any;
 		if (!key || !finalKey) throw new AppError("Missing key or finalKey", 400);
 
-		// Find the pending upload
 		const [pending] = await db.select().from(pendingUploads).where(eq(pendingUploads.key, key));
 
 		if (!pending) throw new AppError("Pending upload not found", 404);
 
-		// Create the video record using stored metadata
 		const videoLength = meta?.durationSec ? Math.round(meta.durationSec) : 0;
 		const title = pending.title || pending.filename || "Untitled Video";
 		const description = pending.description || "";
@@ -205,10 +202,8 @@ export const completeJob = async (req: Request, res: Response, next: NextFunctio
 			})
 			.returning();
 
-		// Mark pending upload as done
 		await db.update(pendingUploads).set({ status: "done" }).where(eq(pendingUploads.key, key));
 
-		// Optional: Delete the raw upload from S3 uploadsBucket
 		try {
 			await deleteObject(uploadsBucket, key);
 		} catch (err) {
@@ -232,7 +227,6 @@ export const failJob = async (req: Request, res: Response, next: NextFunction) =
 			.returning();
 		if (!updated) throw new AppError("Pending upload not found", 404);
 
-		// Optional: Clean up the raw upload from S3
 		try {
 			await deleteObject(uploadsBucket, key);
 		} catch (err) {

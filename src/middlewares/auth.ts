@@ -1,10 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { decodeToken } from "src/lib/jwt";
 
-/**
- * Authentication middleware that validates JWT tokens.
- * @param optional - If true, allows requests to proceed without valid auth. If false (default), requires valid auth.
- */
 export const auth = (optional: boolean = false) => {
 	return (req: Request, res: Response, next: NextFunction) => {
 		try {

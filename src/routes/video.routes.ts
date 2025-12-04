@@ -8,10 +8,8 @@ import z from "zod";
 
 const router = Router();
 
-// Search/list videos with filters and pagination
 router.get("/", auth(true), validate({ querySchema: searchVideos }), videoController.searchVideos);
 
-// Initiate video upload
 router.post(
 	"/initiate",
 	auth(),
@@ -19,7 +17,6 @@ router.post(
 	videoController.initiateUpload,
 );
 
-// Complete video upload
 router.post(
 	"/complete",
 	auth(),
@@ -27,7 +24,6 @@ router.post(
 	videoController.completeUpload,
 );
 
-// Get video by ID
 router.get(
 	"/:id",
 	auth(true),
@@ -39,7 +35,6 @@ router.get(
 	videoController.getVideo,
 );
 
-// Update video details
 router.put(
 	"/:id",
 	auth(),
@@ -47,7 +42,6 @@ router.put(
 	videoController.updateVideo,
 );
 
-// Delete video
 router.delete(
 	"/:id",
 	auth(),
@@ -55,7 +49,6 @@ router.delete(
 	videoController.deleteVideo,
 );
 
-// Get video stream URL
 router.get(
 	"/:id/stream",
 	auth(true),
@@ -63,7 +56,6 @@ router.get(
 	videoController.streamVideo,
 );
 
-// Get videos from a specific user
 router.get(
 	"/user/:userId",
 	auth(true),
@@ -71,10 +63,9 @@ router.get(
 	videoController.getUserVideos,
 );
 
-// User pending uploads
 router.get("/pending", auth(), videoController.getUserPendingJobs);
 
-// Routes for transcoder service
+// Rotas para o transcoder
 router.get("/jobs/next", transcoderAuth, videoController.getNextJob);
 
 router.post("/jobs/complete", transcoderAuth, videoController.completeJob);

@@ -33,8 +33,8 @@ app.listen(PORT, () => {
 	console.log(`Server running on port ${PORT}`);
 
 	runCleanupPending().catch((e) => console.error("Initial cleanup job failed:", e));
-	const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+	const ONE_HOUR_MS = 1 * 60 * 60 * 1000;
 	setInterval(() => {
 		runCleanupPending().catch((e) => console.error("Scheduled cleanup job failed:", e));
-	}, ONE_DAY_MS);
+	}, ONE_HOUR_MS);
 });

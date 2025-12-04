@@ -1,9 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as commentService from "../services/comment.services";
 
-/**
- * Create a comment on a video.
- */
 export const createComment = async (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const userId = req.user!.id;
@@ -17,9 +14,6 @@ export const createComment = async (req: Request, res: Response, next: NextFunct
 	}
 };
 
-/**
- * Get all comments for a video.
- */
 export const getVideoComments = async (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const { videoId } = req.params;
@@ -37,9 +31,6 @@ export const getVideoComments = async (req: Request, res: Response, next: NextFu
 	}
 };
 
-/**
- * Get a single comment by ID.
- */
 export const getComment = async (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const { commentId } = req.params;
@@ -51,9 +42,6 @@ export const getComment = async (req: Request, res: Response, next: NextFunction
 	}
 };
 
-/**
- * Update a comment.
- */
 export const updateComment = async (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const userId = req.user!.id;
@@ -67,9 +55,6 @@ export const updateComment = async (req: Request, res: Response, next: NextFunct
 	}
 };
 
-/**
- * Delete a comment.
- */
 export const deleteComment = async (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const user = req.user!;
@@ -82,9 +67,6 @@ export const deleteComment = async (req: Request, res: Response, next: NextFunct
 	}
 };
 
-/**
- * Get comment count for a video.
- */
 export const getCommentCount = async (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const { videoId } = req.params;

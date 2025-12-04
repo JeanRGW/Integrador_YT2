@@ -6,7 +6,6 @@ import { auth } from "src/middlewares/auth";
 
 const router = Router();
 
-// Toggle like/dislike on a video
 router.post(
 	"/:videoId",
 	auth(),
@@ -14,7 +13,6 @@ router.post(
 	likeController.toggleLike,
 );
 
-// Get current user's like status for a video
 router.get(
 	"/:videoId/status",
 	auth(),
@@ -22,7 +20,6 @@ router.get(
 	likeController.getUserLikeStatus,
 );
 
-// Get like/dislike counts for a video (public endpoint)
 router.get(
 	"/:videoId/counts",
 	auth(true),
@@ -30,7 +27,6 @@ router.get(
 	likeController.getVideoLikeCounts,
 );
 
-// Remove like/dislike from a video
 router.delete(
 	"/:videoId",
 	auth(),

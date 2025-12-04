@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 
 export function transcoderAuth(req: Request, res: Response, next: NextFunction) {
 	if (!process.env.TRANSCODER_SECRET) {
-		// Fail fast if the secret is not configured
 		return res
 			.status(500)
 			.json({ message: "Server misconfiguration: TRANSCODER_SECRET is not set" });

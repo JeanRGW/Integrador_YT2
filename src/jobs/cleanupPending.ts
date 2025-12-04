@@ -4,13 +4,10 @@ import { pendingUploads } from "@db/schema";
 import { lt, eq } from "drizzle-orm";
 import { uploadsBucket, objectExists, deleteObject } from "src/lib/s3";
 
-// Cleanup not done/failed uploads older than 24 hours from createdAt
-// Removes S3 object if present and deletes DB rows
 export async function runCleanupPending() {
 	const now = new Date();
 	const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-	// Fetch candidates older than cutoff
 	const candidates = await db.query.pendingUploads.findMany({
 		where: (t, { lt, and, notInArray }) =>
 			and(lt(t.createdAt, cutoff), notInArray(t.status, ["done", "failed"])),

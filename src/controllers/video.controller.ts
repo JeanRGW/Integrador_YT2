@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { pendingUploads, videos } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { SearchVideos } from "src/schemas/videoSchemas";
+import { MIN_VIDEO_UPLOAD_INTERVAL } from "src/lib/constants";
 
 export const searchVideos = async (req: Request, res: Response, next: NextFunction) => {
 	try {
@@ -25,10 +26,15 @@ export const initiateUpload = async (req: Request, res: Response, next: NextFunc
 		const userId = req.user!.id;
 		const { filename, contentType, title, description, visibility } = req.body as any;
 
-		const maxPending = 2;
+		const maxPending = 5;
 		const pendingCount = (
 			await db.query.pendingUploads.findMany({
-				where: (t, { eq, or, and }) => and(eq(t.userId, userId), eq(t.status, "initiated")),
+				where: (t, { eq, and, lte }) =>
+					and(
+						eq(t.userId, userId),
+						eq(t.status, "initiated"),
+						lte(t.createdAt, new Date(Date.now() + MIN_VIDEO_UPLOAD_INTERVAL)),
+					),
 			})
 		).length;
 
@@ -38,14 +44,17 @@ export const initiateUpload = async (req: Request, res: Response, next: NextFunc
 		const uuid = randomUUID();
 		const ext = filename && filename.includes(".") ? `.${filename.split(".").pop()}` : "";
 		const key = `uploads/${userId}/${uuid}${ext}`;
-		const presigned = await getPresignedPostForUploads(key, 2000 * 1024 * 1024, contentType, 900);
+		const presigned = await getPresignedPostForUploads(
+			key,
+			2000 * 1024 * 1024,
+			contentType,
+			MIN_VIDEO_UPLOAD_INTERVAL / 1000 + 300,
+		);
 
-		const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min
 		await db.insert(pendingUploads).values({
 			userId,
 			key,
 			contentType,
-			expiresAt,
 			filename,
 			title: title || filename || "Untitled Video",
 			description: description || "",

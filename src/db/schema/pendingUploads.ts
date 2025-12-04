@@ -26,7 +26,6 @@ export const pendingUploads = pgTable("pending_uploads", {
 	description: text("description"),
 	visibility: visibilityEnum("visibility").default("public"),
 	createdAt: timestamp("created_at").notNull().defaultNow(),
-	expiresAt: timestamp("expires_at").notNull(),
 	status: pendingStatusEnum("status").notNull().default("initiated"),
 });
 

@@ -8,6 +8,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
+import { MIN_VIDEO_UPLOAD_INTERVAL } from "./constants";
 
 const {
 	S3_ENDPOINT,
@@ -77,7 +78,7 @@ export const getPresignedPostForUploads = async (
 	key: string,
 	maxBytes = 2000 * 1024 * 1024,
 	contentType?: string,
-	expiresSeconds = 900,
+	expiresSeconds = MIN_VIDEO_UPLOAD_INTERVAL + 300,
 ) => {
 	// Conditions: max size and optional content type enforcement
 	const conditions: any[] = [["content-length-range", 0, maxBytes]];

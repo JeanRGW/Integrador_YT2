@@ -1,0 +1,1 @@
+ALTER TABLE "pending_uploads" DROP COLUMN "expires_at";

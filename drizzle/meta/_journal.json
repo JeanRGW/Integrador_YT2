@@ -29,6 +29,13 @@
       "when": 1764794900401,
       "tag": "0003_create_database_level_on_delete_on_update",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1764809102206,
+      "tag": "0004_removed_expires_at_from_pending_upload",
+      "breakpoints": true
     }
   ]
 }

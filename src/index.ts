@@ -8,6 +8,7 @@ import cors from "cors";
 import { errorHandler } from "./middlewares/errorHandler";
 import { ensureBuckets } from "./lib/s3";
 import apiRouter from "./routes/index";
+import { runCleanupPending } from "./jobs/cleanupPending";
 
 (async () => {
 	try {
@@ -20,9 +21,6 @@ import apiRouter from "./routes/index";
 
 const app = express();
 
-app.use("/public", express.static("public"));
-
-// Enable CORS for browser clients
 app.use(cors());
 app.use(express.json());
 
@@ -33,4 +31,10 @@ app.use(errorHandler);
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 app.listen(PORT, () => {
 	console.log(`Server running on port ${PORT}`);
+
+	runCleanupPending().catch((e) => console.error("Initial cleanup job failed:", e));
+	const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+	setInterval(() => {
+		runCleanupPending().catch((e) => console.error("Scheduled cleanup job failed:", e));
+	}, ONE_DAY_MS);
 });

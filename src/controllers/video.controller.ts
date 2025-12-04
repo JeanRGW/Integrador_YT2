@@ -5,7 +5,7 @@ import { getPresignedPostForUploads, objectExists, uploadsBucket, deleteObject }
 import db from "@db/index";
 import { randomUUID } from "node:crypto";
 import { pendingUploads, videos } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { SearchVideos } from "src/schemas/videoSchemas";
 import { MAX_VIDEO_UPLOAD_SIZE, MIN_VIDEO_UPLOAD_INTERVAL } from "src/lib/constants";
 
@@ -75,13 +75,13 @@ export const completeUpload = async (req: Request, res: Response, next: NextFunc
 		const exists = await objectExists(uploadsBucket, key);
 		if (!exists) throw new AppError("Uploaded file not found", 400);
 
-		const pending = await db.query.pendingUploads.findFirst({
-			where: (t, { eq, and }) => and(eq(t.key, key), eq(t.userId, userId)),
-		});
+		const [updated] = await db
+			.update(pendingUploads)
+			.set({ status: "uploaded" })
+			.where(and(eq(pendingUploads.key, key), eq(pendingUploads.userId, userId)))
+			.returning();
 
-		if (!pending) throw new AppError("Pending upload not found", 404);
-
-		await db.update(pendingUploads).set({ status: "uploaded" }).where(eq(pendingUploads.key, key));
+		if (!updated) throw new AppError("Pending upload not found", 404);
 
 		return res.status(202).json({ message: "Upload received; processing queued", key });
 	} catch (err) {

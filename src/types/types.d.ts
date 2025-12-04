@@ -1,6 +1,8 @@
+import { ZodType } from "zod";
+
 export type ValidationSchema = {
-	querySchema?: StrictZodObject;
-	bodySchema?: StrictZodObject;
-	paramsSchema?: StrictZodObject;
-	headerSchema?: StrictZodObject;
+	querySchema?: ZodType;
+	bodySchema?: ZodType;
+	paramsSchema?: ZodType;
+	headerSchema?: ZodType;
 };

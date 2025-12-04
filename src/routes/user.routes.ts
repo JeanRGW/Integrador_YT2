@@ -35,11 +35,6 @@ router.post(
 );
 
 router.delete("/me/photo", auth(), userController.removePhoto);
-router.post(
-	"/me/photo",
-	auth(),
-	uploadPhoto.single("photo"),
-	userController.uploadPhotoDirect,
-);
+router.post("/me/photo", auth(), uploadPhoto.single("photo"), userController.uploadPhotoDirect);
 
 export default router;

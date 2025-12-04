@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as videoService from "../services/video.services";
 import AppError from "src/lib/AppError";
-import { getVideoStreamUrl } from "src/services/video.services";
 import { getPresignedPostForUploads, objectExists, uploadsBucket, deleteObject } from "src/lib/s3";
 import db from "@db/index";
 import { randomUUID } from "node:crypto";
@@ -12,7 +11,6 @@ import { MAX_VIDEO_UPLOAD_SIZE, MIN_VIDEO_UPLOAD_INTERVAL } from "src/lib/consta
 
 export const searchVideos = async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const requesterId = req.user?.id;
 		const filters = req.query as unknown as SearchVideos;
 		const result = await videoService.searchVideos(filters);
 		return res.json(result);
@@ -77,13 +75,13 @@ export const completeUpload = async (req: Request, res: Response, next: NextFunc
 		const exists = await objectExists(uploadsBucket, key);
 		if (!exists) throw new AppError("Uploaded file not found", 400);
 
-		const [pending] = await db
-			.update(pendingUploads)
-			.set({ status: "uploaded" })
-			.where(eq(pendingUploads.key, key))
-			.returning();
+		const pending = await db.query.pendingUploads.findFirst({
+			where: (t, { eq, and }) => and(eq(t.key, key), eq(t.userId, userId)),
+		});
 
 		if (!pending) throw new AppError("Pending upload not found", 404);
+
+		await db.update(pendingUploads).set({ status: "uploaded" }).where(eq(pendingUploads.key, key));
 
 		return res.status(202).json({ message: "Upload received; processing queued", key });
 	} catch (err) {
@@ -123,7 +121,7 @@ export const deleteVideo = async (req: Request, res: Response, next: NextFunctio
 export const streamVideo = async (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const requester = req.user;
-		const { url } = await getVideoStreamUrl(req.params.id, requester);
+		const { url } = await videoService.getVideoStreamUrl(req.params.id, requester);
 		return res.json({ url });
 	} catch (err) {
 		next(err);

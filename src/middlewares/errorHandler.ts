@@ -1,4 +1,4 @@
-import { NextFunction, Request, RequestHandler, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import AppError from "src/lib/AppError";
 import { ZodError } from "zod";
 

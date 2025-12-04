@@ -4,6 +4,7 @@ import { videos } from "@db/schema/videos";
 import { users } from "@db/schema/users";
 import { eq, and, desc, asc } from "drizzle-orm";
 import AppError from "src/lib/AppError";
+import { UserJWT } from "src/types/express";
 
 /**
  * Create a comment on a video.
@@ -141,13 +142,14 @@ export const updateComment = async (commentId: string, userId: string, text: str
 /**
  * Delete a comment (only by owner).
  */
-export const deleteComment = async (commentId: string, userId: string) => {
+export const deleteComment = async (commentId: string, user: UserJWT) => {
 	const comment = await db.query.videoComments.findFirst({
 		where: (t, { eq }) => eq(t.id, commentId),
 	});
 
 	if (!comment) throw new AppError("Comment not found", 404);
-	if (comment.userId !== userId) throw new AppError("You do not own this comment", 403);
+	if (comment.userId !== user.id && user.role !== "admin")
+		throw new AppError("You do not own this comment", 403);
 
 	await db.delete(videoComments).where(eq(videoComments.id, commentId));
 

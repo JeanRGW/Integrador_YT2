@@ -5,6 +5,7 @@ import AppError from "src/lib/AppError";
 import { CreateVideo, InitiateVideo, UpdateVideo, SearchVideos } from "src/schemas/videoSchemas";
 import { getVideoSignedUrl, deleteObject, videosBucket } from "src/lib/s3";
 import { users } from "@db/schema";
+import { UserJWT } from "src/types/express";
 
 /**
  * Get a video by ID with access control.
@@ -12,7 +13,7 @@ import { users } from "@db/schema";
  * - Link-only videos are accessible to everyone who has the link.
  * - Hidden videos are only accessible to the owner.
  */
-export const getVideo = async (id: string, requesterId?: string) => {
+export const getVideo = async (id: string, requester?: UserJWT) => {
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, id),
 		with: {
@@ -30,7 +31,7 @@ export const getVideo = async (id: string, requesterId?: string) => {
 
 	// Access control: hidden videos require ownership
 	if (video.visibility === "hidden") {
-		if (!requesterId || video.userId !== requesterId) {
+		if (!requester || (video.userId !== requester.id && requester.role !== "admin")) {
 			throw new AppError("Video not found", 404);
 		}
 	}
@@ -38,26 +39,28 @@ export const getVideo = async (id: string, requesterId?: string) => {
 	return video;
 };
 
-export const updateVideo = async (id: string, userId: string, data: UpdateVideo) => {
+export const updateVideo = async (id: string, user: UserJWT, data: UpdateVideo) => {
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, id),
 	});
 
 	if (!video) throw new AppError("Video not found", 404);
-	if (video.userId !== userId) throw new AppError("You do not own this video", 403);
+	if (video.userId !== user.id && user.role !== "admin")
+		throw new AppError("You do not own this video", 403);
 
 	const [updated] = await db.update(videos).set(data).where(eq(videos.id, id)).returning();
 
 	return updated;
 };
 
-export const deleteVideo = async (id: string, userId: string) => {
+export const deleteVideo = async (id: string, user: UserJWT) => {
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, id),
 	});
 
 	if (!video) throw new AppError("Video not found", 404);
-	if (video.userId !== userId) throw new AppError("You do not own this video", 403);
+	if (video.userId !== user.id && user.role !== "admin")
+		throw new AppError("You do not own this video", 403);
 
 	// Delete from database first
 	await db.delete(videos).where(eq(videos.id, id));
@@ -101,14 +104,14 @@ export const listUserVideos = async (userId: string) => {
  */
 export const listUserVideosForRequester = async (
 	targetUserId: string,
-	requesterId: string | undefined,
+	requester?: UserJWT,
 	options?: { page?: number; pageSize?: number },
 ) => {
 	const page = options?.page && options.page > 0 ? options.page : 1;
 	const pageSize = options?.pageSize && options.pageSize > 0 ? options.pageSize : 10;
 	const offset = (page - 1) * pageSize;
 
-	if (requesterId && requesterId === targetUserId) {
+	if (requester && (requester.id === targetUserId || requester.role === "admin")) {
 		// Owner: sees all
 		return db.query.videos.findMany({
 			where: (t, { eq }) => eq(t.userId, targetUserId),
@@ -148,7 +151,7 @@ export const listUserVideosForRequester = async (
  * - Link-only videos are accessible to everyone who has the link.
  * - Hidden videos are only accessible to the owner.
  */
-export const getVideoStreamUrl = async (id: string, requesterId?: string) => {
+export const getVideoStreamUrl = async (id: string, requester?: UserJWT) => {
 	const video = await db.query.videos.findFirst({
 		where: (t, { eq }) => eq(t.id, id),
 	});
@@ -157,7 +160,7 @@ export const getVideoStreamUrl = async (id: string, requesterId?: string) => {
 
 	// Access control: hidden videos require ownership
 	if (video.visibility === "hidden") {
-		if (!requesterId || video.userId !== requesterId) {
+		if (!requester || (video.userId !== requester.id && requester.role !== "admin")) {
 			throw new AppError("Video not found", 404);
 		}
 	}
@@ -210,7 +213,7 @@ export const createVideoFromUpload = async (
  * Only returns public videos (and link-only for direct access).
  * Hidden videos are excluded from search results.
  */
-export const searchVideos = async (filters: SearchVideos, requesterId?: string) => {
+export const searchVideos = async (filters: SearchVideos) => {
 	const {
 		q,
 		uploaderName,

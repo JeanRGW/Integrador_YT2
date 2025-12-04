@@ -1,8 +1,10 @@
-import { pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { videos } from "./videos";
 import { relations } from "drizzle-orm";
 import { videoComments } from "./videoComments";
 import { videoLikes } from "./videoLikes";
+
+export const userRoleEnum = pgEnum("user_role", ["user", "admin"]);
 
 export const users = pgTable("users", {
 	id: uuid("id").primaryKey().notNull().defaultRandom(),
@@ -10,6 +12,7 @@ export const users = pgTable("users", {
 	email: text("email").notNull().unique(), // Normalizar minusculas antes de inserir
 	photoUrl: text("photo_url"),
 	pwHash: text("password_hash").notNull(),
+	role: userRoleEnum("role").notNull().default("user"),
 });
 
 export const usersRelations = relations(users, ({ many }) => ({

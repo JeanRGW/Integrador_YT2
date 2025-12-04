@@ -14,7 +14,7 @@ export const searchVideos = async (req: Request, res: Response, next: NextFuncti
 	try {
 		const requesterId = req.user?.id;
 		const filters = req.query as unknown as SearchVideos;
-		const result = await videoService.searchVideos(filters, requesterId);
+		const result = await videoService.searchVideos(filters);
 		return res.json(result);
 	} catch (err) {
 		next(err);
@@ -94,8 +94,8 @@ export const completeUpload = async (req: Request, res: Response, next: NextFunc
 
 export const getVideo = async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const requesterId = req.user?.id;
-		const video = await videoService.getVideo(req.params.id, requesterId);
+		const requester = req.user;
+		const video = await videoService.getVideo(req.params.id, requester);
 		return res.json(video);
 	} catch (err) {
 		next(err);
@@ -104,7 +104,7 @@ export const getVideo = async (req: Request, res: Response, next: NextFunction) 
 
 export const updateVideo = async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const video = await videoService.updateVideo(req.params.id, req.user!.id, req.body);
+		const video = await videoService.updateVideo(req.params.id, req.user!, req.body);
 
 		return res.json(video);
 	} catch (err) {
@@ -114,7 +114,7 @@ export const updateVideo = async (req: Request, res: Response, next: NextFunctio
 
 export const deleteVideo = async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const result = await videoService.deleteVideo(req.params.id, req.user!.id);
+		const result = await videoService.deleteVideo(req.params.id, req.user!);
 		return res.json(result);
 	} catch (err) {
 		next(err);
@@ -123,8 +123,8 @@ export const deleteVideo = async (req: Request, res: Response, next: NextFunctio
 
 export const streamVideo = async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const requesterId = req.user?.id;
-		const { url } = await getVideoStreamUrl(req.params.id, requesterId);
+		const requester = req.user;
+		const { url } = await getVideoStreamUrl(req.params.id, requester);
 		return res.json({ url });
 	} catch (err) {
 		next(err);
@@ -133,10 +133,10 @@ export const streamVideo = async (req: Request, res: Response, next: NextFunctio
 
 export const getUserVideos = async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const requesterId = req.user?.id;
+		const requester = req.user;
 		const page = req.query.page ? Number(req.query.page) : undefined;
 		const pageSize = req.query.pageSize ? Number(req.query.pageSize) : undefined;
-		const videos = await videoService.listUserVideosForRequester(req.params.userId, requesterId, {
+		const videos = await videoService.listUserVideosForRequester(req.params.userId, requester, {
 			page,
 			pageSize,
 		});

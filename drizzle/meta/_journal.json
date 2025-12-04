@@ -36,6 +36,13 @@
       "when": 1764809102206,
       "tag": "0004_removed_expires_at_from_pending_upload",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1764811888038,
+      "tag": "0005_added_role_to_user_table",
+      "breakpoints": true
     }
   ]
 }

@@ -72,10 +72,10 @@ export const updateComment = async (req: Request, res: Response, next: NextFunct
  */
 export const deleteComment = async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const userId = req.user!.id;
+		const user = req.user!;
 		const { commentId } = req.params;
 
-		const result = await commentService.deleteComment(commentId, userId);
+		const result = await commentService.deleteComment(commentId, user);
 		return res.json(result);
 	} catch (err) {
 		next(err);

@@ -18,9 +18,9 @@ export const auth = (optional: boolean = false) => {
 			}
 
 			const token = authHeader.split(" ")[1];
-			const userId = decodeToken(token);
+			const user = decodeToken(token);
 
-			req.user = { id: userId };
+			req.user = { id: user.id, role: user.role };
 			next();
 		} catch (error) {
 			if (optional) {

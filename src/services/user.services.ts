@@ -90,7 +90,7 @@ export const signUser = async (data: SignInUser) => {
 
 	if (!passwordMatch) throw new AppError("Invalid credentials", 401);
 
-	return { token: signToken(user.id) };
+	return { user, token: signToken(user.id, user.role) };
 };
 
 export const removePhoto = async (userId: string) => {

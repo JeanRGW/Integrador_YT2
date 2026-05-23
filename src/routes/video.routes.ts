@@ -3,6 +3,7 @@ import * as videoController from "../controllers/video.controller";
 import { validate } from "src/middlewares/validate";
 import { updateVideo, initiateVideo, completeVideo, searchVideos } from "src/schemas/videoSchemas";
 import { auth } from "src/middlewares/auth";
+import { uploadRateLimit } from "src/middlewares/rateLimit";
 import { transcoderAuth } from "src/middlewares/transcoderAuth";
 import z from "zod";
 
@@ -12,6 +13,7 @@ router.get("/", auth(true), validate({ querySchema: searchVideos }), videoContro
 
 router.post(
 	"/initiate",
+	uploadRateLimit,
 	auth(),
 	validate({ bodySchema: initiateVideo }),
 	videoController.initiateUpload,

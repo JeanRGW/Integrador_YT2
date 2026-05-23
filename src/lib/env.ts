@@ -11,7 +11,9 @@ const requiredEnvVars: RequiredEnv[] = [
 	{ key: "S3_SECRET_KEY" },
 	{ key: "S3_UPLOADS_BUCKET" },
 	{ key: "S3_VIDEOS_BUCKET" },
+	{ key: "S3_IMAGES_BUCKET" },
 	{ key: "TRANSCODER_SECRET" },
+	{ key: "CORS_ORIGIN", optional: true },
 ];
 
 export function validateEnv() {

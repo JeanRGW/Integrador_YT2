@@ -9,6 +9,7 @@ import { errorHandler } from "./middlewares/errorHandler";
 import { ensureBuckets } from "./lib/s3";
 import apiRouter from "./routes/index";
 import { runCleanupPending } from "./jobs/cleanupPending";
+import { globalRateLimit } from "./middlewares/rateLimit";
 
 (async () => {
 	try {
@@ -21,10 +22,10 @@ import { runCleanupPending } from "./jobs/cleanupPending";
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+app.use(cors({ origin: process.env.CORS_ORIGIN || "*" }));
+app.use(express.json({ limit: "10mb" }));
 
-app.use("/api", apiRouter);
+app.use("/api", globalRateLimit, apiRouter);
 
 app.use(errorHandler);
 

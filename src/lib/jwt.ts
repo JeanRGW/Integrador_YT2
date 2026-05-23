@@ -4,7 +4,7 @@ const { JWT_SECRET } = process.env;
 if (!JWT_SECRET) throw new Error("JWT_SECRET not defined on environment.");
 
 export const signToken = (uuid: string, role: string): string =>
-	jwt.sign({ role }, JWT_SECRET, { subject: uuid });
+	jwt.sign({ role }, JWT_SECRET, { subject: uuid, expiresIn: "7d" });
 
 export const decodeToken = (
 	token: string,

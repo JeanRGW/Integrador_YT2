@@ -20,11 +20,12 @@ export const createUser = async (userInsert: CreateUser) => {
 
 	if (emailExists) throw new AppError("Email already in use", 422);
 
-	const pwHash = await hash(password, 8);
+	const pwHash = await hash(password, 12);
 
 	const [user] = await db.insert(users).values({ email, name, pwHash }).returning();
 
-	return user;
+	const { pwHash: _, ...safeUser } = user;
+	return safeUser;
 };
 
 export const getUser = async (uuid: string) => {
@@ -32,7 +33,8 @@ export const getUser = async (uuid: string) => {
 
 	if (!user) throw new AppError("User not found.", 404);
 
-	return user;
+	const { pwHash: _, ...safeUser } = user;
+	return safeUser;
 };
 
 export const updateUser = async (uuid: string, userUpdate: UpdateUser) => {
@@ -54,7 +56,7 @@ export const updateUser = async (uuid: string, userUpdate: UpdateUser) => {
 		if (!(await compare(oldPassword, user.pwHash)))
 			throw new AppError("Old password doesnt match.");
 
-		pwHash = await hash(password, 8);
+		pwHash = await hash(password, 12);
 	}
 
 	if (email) {
@@ -74,7 +76,8 @@ export const updateUser = async (uuid: string, userUpdate: UpdateUser) => {
 
 	const [updatedUser] = await db.update(users).set(data).where(eq(users.id, uuid)).returning();
 
-	return updatedUser;
+	const { pwHash: _, ...safeUser } = updatedUser;
+	return safeUser;
 };
 
 export const signUser = async (data: SignInUser) => {
@@ -90,7 +93,8 @@ export const signUser = async (data: SignInUser) => {
 
 	if (!passwordMatch) throw new AppError("Invalid credentials", 401);
 
-	return { user, token: signToken(user.id, user.role) };
+	const { pwHash: _, ...safeUser } = user;
+	return { user: safeUser, token: signToken(user.id, user.role) };
 };
 
 export const removePhoto = async (userId: string) => {
@@ -142,5 +146,6 @@ export const uploadPhotoDirect = async (
 		.where(eq(users.id, userId))
 		.returning();
 
-	return updated;
+	const { pwHash: _, ...safeUser } = updated;
+	return safeUser;
 };

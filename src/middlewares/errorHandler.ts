@@ -24,7 +24,7 @@ export const errorHandler = async (err: any, req: Request, res: Response, next: 
 		});
 	}
 
-	console.error("Unhandled error:", err);
+	console.error("Unhandled error:", err.stack ?? err);
 
 	return res.status(500).json({
 		code: 500,

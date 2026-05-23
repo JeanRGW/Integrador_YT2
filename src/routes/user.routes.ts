@@ -3,6 +3,7 @@ import * as userController from "../controllers/user.controller";
 import { validate } from "src/middlewares/validate";
 import { createUser, updateUser, signInUser } from "src/schemas/userSchemas";
 import { auth } from "src/middlewares/auth";
+import { signInRateLimit } from "src/middlewares/rateLimit";
 import uploadPhoto from "src/middlewares/uploadPhoto";
 
 const router = Router();
@@ -28,6 +29,7 @@ router.put(
 
 router.post(
 	"/signin",
+	signInRateLimit,
 	validate({
 		bodySchema: signInUser,
 	}),

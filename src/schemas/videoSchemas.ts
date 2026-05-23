@@ -1,12 +1,5 @@
 import z from "zod";
 
-export const createVideo = z.object({
-	title: z.string().min(1),
-	description: z.string().min(1),
-	visibility: z.enum(["hidden", "link-only", "public"]).default("public"),
-});
-export type CreateVideo = z.infer<typeof createVideo>;
-
 export const initiateVideo = z.object({
 	title: z.string().min(1),
 	description: z.string().min(1),
@@ -32,25 +25,6 @@ export const updateVideo = z
 	})
 	.strict();
 export type UpdateVideo = z.infer<typeof updateVideo>;
-
-export const processedWebhook = z
-	.object({
-		pendingKey: z.string().min(1),
-		finalKey: z.string().min(1),
-		meta: z
-			.object({
-				durationSec: z.number().nullable().optional(),
-				width: z.number().nullable().optional(),
-				height: z.number().nullable().optional(),
-			})
-			.optional(),
-		userId: z.string().optional(),
-		title: z.string().min(1).optional(),
-		description: z.string().min(1).optional(),
-		visibility: z.enum(["hidden", "link-only", "public"]).optional(),
-	})
-	.strict();
-export type ProcessedWebhook = z.infer<typeof processedWebhook>;
 
 export const searchVideos = z.object({
 	q: z.string().optional(),

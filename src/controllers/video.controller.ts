@@ -1,12 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import * as videoService from "../services/video.services";
 import AppError from "src/lib/AppError";
-import { getVideoStreamUrl } from "src/services/video.services";
 import { getPresignedPostForUploads, objectExists, uploadsBucket, deleteObject } from "src/lib/s3";
 import db from "@db/index";
 import { randomUUID } from "node:crypto";
 import { pendingUploads, videos } from "@db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 import { SearchVideos } from "src/schemas/videoSchemas";
 import { MAX_VIDEO_UPLOAD_SIZE, MIN_VIDEO_UPLOAD_INTERVAL } from "src/lib/constants";
 
@@ -29,11 +28,11 @@ export const initiateUpload = async (req: Request, res: Response, next: NextFunc
 		const maxPending = 5;
 		const pendingCount = (
 			await db.query.pendingUploads.findMany({
-				where: (t, { eq, and, lte }) =>
+				where: (t, { eq, and }) =>
 					and(
 						eq(t.userId, userId),
 						eq(t.status, "initiated"),
-						lte(t.createdAt, new Date(Date.now() + MIN_VIDEO_UPLOAD_INTERVAL)),
+						gte(t.createdAt, new Date(Date.now() - MIN_VIDEO_UPLOAD_INTERVAL)),
 					),
 			})
 		).length;
@@ -123,7 +122,7 @@ export const deleteVideo = async (req: Request, res: Response, next: NextFunctio
 export const streamVideo = async (req: Request, res: Response, next: NextFunction) => {
 	try {
 		const requester = req.user;
-		const { url } = await getVideoStreamUrl(req.params.id, requester);
+		const { url } = await videoService.getVideoStreamUrl(req.params.id, requester);
 		return res.json({ url });
 	} catch (err) {
 		next(err);

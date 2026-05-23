@@ -2,7 +2,7 @@ import db from "@db/index";
 import { videos } from "@db/schema/videos";
 import { eq, and, or, ilike, gte, lte, asc, desc, sql } from "drizzle-orm";
 import AppError from "src/lib/AppError";
-import { InitiateVideo, UpdateVideo, SearchVideos } from "src/schemas/videoSchemas";
+import { UpdateVideo, SearchVideos } from "src/schemas/videoSchemas";
 import { getVideoSignedUrl, deleteObject, videosBucket } from "src/lib/s3";
 import { users } from "@db/schema";
 import { UserJWT } from "src/types/express";
@@ -65,22 +65,6 @@ export const deleteVideo = async (id: string, user: UserJWT) => {
 	return { message: "Video deleted successfully" };
 };
 
-export const listUserVideos = async (userId: string) => {
-	const videosList = await db.query.videos.findMany({
-		where: (t, { eq }) => eq(t.userId, userId),
-		with: {
-			owner: {
-				columns: {
-					id: true,
-					name: true,
-					photoUrl: true,
-				},
-			},
-		},
-	});
-	return videosList;
-};
-
 export const listUserVideosForRequester = async (
 	targetUserId: string,
 	requester?: UserJWT,
@@ -141,33 +125,6 @@ export const getVideoStreamUrl = async (id: string, requester?: UserJWT) => {
 
 	const signedUrl = await getVideoSignedUrl(keyOrUrl);
 	return { url: signedUrl };
-};
-
-export const initiateVideoUpload = async (userId: string, data: InitiateVideo) => {};
-
-export const createVideoFromUpload = async (
-	userId: string,
-	key: string,
-	meta: {
-		title?: string;
-		description?: string;
-		visibility?: "hidden" | "link-only" | "public";
-		videoLength?: number;
-	},
-) => {
-	const [video] = await db
-		.insert(videos)
-		.values({
-			userId,
-			title: meta.title ?? "Untitled",
-			description: meta.description ?? "",
-			visibility: meta.visibility ?? "public",
-			videoLength: meta.videoLength ?? 0,
-			video: key,
-		})
-		.returning();
-
-	return video;
 };
 
 export const searchVideos = async (filters: SearchVideos) => {

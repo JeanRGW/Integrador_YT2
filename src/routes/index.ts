@@ -6,6 +6,10 @@ import commentRouter from "./comment.routes";
 
 const api = Router();
 
+api.get("/health", (_req, res) => {
+	res.json({ status: "ok", uptime: process.uptime() });
+});
+
 api.use("/users", userRouter);
 api.use("/videos", videoRouter);
 api.use("/likes", likeRouter);

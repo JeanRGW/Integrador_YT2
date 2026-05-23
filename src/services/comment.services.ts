@@ -2,7 +2,7 @@ import db from "@db/index";
 import { videoComments } from "@db/schema/videoComments";
 import { videos } from "@db/schema/videos";
 import { users } from "@db/schema/users";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
 import AppError from "src/lib/AppError";
 import { UserJWT } from "src/types/express";
 
@@ -131,9 +131,12 @@ export const deleteComment = async (commentId: string, user: UserJWT) => {
 };
 
 export const getCommentCount = async (videoId: string) => {
-	const comments = await db.query.videoComments.findMany({
-		where: (t, { eq }) => eq(t.videoId, videoId),
-	});
+	const [{ count }] = await db
+		.select({ count: sql<number>`count(*)::int` })
+		.from(videoComments)
+		.where(eq(videoComments.videoId, videoId));
 
-	return { count: comments.length };
+	const result = count ? Number(count) : 0;
+
+	return { count: result };
 };

@@ -6,7 +6,7 @@ import { getPresignedPostForUploads, objectExists, uploadsBucket, deleteObject }
 import db from "@db/index";
 import { randomUUID } from "node:crypto";
 import { pendingUploads, videos } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { SearchVideos } from "src/schemas/videoSchemas";
 import { MAX_VIDEO_UPLOAD_SIZE, MIN_VIDEO_UPLOAD_INTERVAL } from "src/lib/constants";
 
@@ -80,7 +80,7 @@ export const completeUpload = async (req: Request, res: Response, next: NextFunc
 		const [pending] = await db
 			.update(pendingUploads)
 			.set({ status: "uploaded" })
-			.where(eq(pendingUploads.key, key))
+			.where(and(eq(pendingUploads.key, key), eq(pendingUploads.userId, userId)))
 			.returning();
 
 		if (!pending) throw new AppError("Pending upload not found", 404);
@@ -159,15 +159,23 @@ export const getUserPendingJobs = async (req: Request, res: Response, next: Next
 
 export const getNextJob = async (req: Request, res: Response, next: NextFunction) => {
 	try {
-		const item = await db.query.pendingUploads.findFirst({
-			where: (t, { eq }) => eq(t.status, "uploaded"),
-		});
-
-		item &&
-			(await db
-				.update(pendingUploads)
-				.set({ status: "processing" })
-				.where(eq(pendingUploads.key, item.key)));
+		const [item] = await db
+			.update(pendingUploads)
+			.set({ status: "processing" })
+			.where(
+				and(
+					eq(
+						pendingUploads.id,
+						db
+							.select({ id: pendingUploads.id })
+							.from(pendingUploads)
+							.where(eq(pendingUploads.status, "uploaded"))
+							.limit(1),
+					),
+					eq(pendingUploads.status, "uploaded"),
+				),
+			)
+			.returning();
 
 		if (!item) return res.status(204).end();
 		return res.json(item);
@@ -181,28 +189,33 @@ export const completeJob = async (req: Request, res: Response, next: NextFunctio
 		const { key, finalKey, meta } = req.body as any;
 		if (!key || !finalKey) throw new AppError("Missing key or finalKey", 400);
 
-		const [pending] = await db.select().from(pendingUploads).where(eq(pendingUploads.key, key));
+		const video = await db.transaction(async (tx) => {
+			const [pending] = await tx.select().from(pendingUploads).where(eq(pendingUploads.key, key));
+			if (!pending) throw new AppError("Pending upload not found", 404);
 
-		if (!pending) throw new AppError("Pending upload not found", 404);
+			const videoLength = meta?.durationSec ? Math.round(meta.durationSec) : 0;
+			const title = pending.title || pending.filename || "Untitled Video";
+			const description = pending.description || "";
 
-		const videoLength = meta?.durationSec ? Math.round(meta.durationSec) : 0;
-		const title = pending.title || pending.filename || "Untitled Video";
-		const description = pending.description || "";
-		const visibility = pending.visibility || "public";
+			const [inserted] = await tx
+				.insert(videos)
+				.values({
+					userId: pending.userId,
+					title,
+					description,
+					visibility: pending.visibility || "public",
+					videoLength,
+					video: finalKey,
+				})
+				.returning();
 
-		const [video] = await db
-			.insert(videos)
-			.values({
-				userId: pending.userId,
-				title,
-				description,
-				visibility,
-				videoLength,
-				video: finalKey,
-			})
-			.returning();
+			await tx
+				.update(pendingUploads)
+				.set({ status: "done" })
+				.where(eq(pendingUploads.key, key));
 
-		await db.update(pendingUploads).set({ status: "done" }).where(eq(pendingUploads.key, key));
+			return inserted;
+		});
 
 		try {
 			await deleteObject(uploadsBucket, key);

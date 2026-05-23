@@ -6,75 +6,77 @@ import AppError from "src/lib/AppError";
 export const toggleLike = async (videoId: string, userId: string, type: "like" | "dislike") => {
 	const isLike = type === "like";
 
-	const video = await db.query.videos.findFirst({
-		where: (t, { eq }) => eq(t.id, videoId),
-	});
+	return db.transaction(async (tx) => {
+		const video = await tx.query.videos.findFirst({
+			where: (t, { eq }) => eq(t.id, videoId),
+		});
 
-	if (!video) throw new AppError("Video not found", 404);
+		if (!video) throw new AppError("Video not found", 404);
 
-	const existing = await db.query.videoLikes.findFirst({
-		where: (t, { eq, and }) => and(eq(t.videoId, videoId), eq(t.userId, userId)),
-	});
+		const existing = await tx.query.videoLikes.findFirst({
+			where: (t, { eq, and }) => and(eq(t.videoId, videoId), eq(t.userId, userId)),
+		});
 
-	if (existing) {
-		if (existing.type === type) {
-			await db.delete(videoLikes).where(eq(videoLikes.id, existing.id));
+		if (existing) {
+			if (existing.type === type) {
+				await tx.delete(videoLikes).where(eq(videoLikes.id, existing.id));
 
-			await db
-				.update(videos)
-				.set(
-					isLike
-						? { likeCount: sql`${videos.likeCount} - 1` }
-						: { dislikeCount: sql`${videos.dislikeCount} - 1` },
-				)
-				.where(eq(videos.id, videoId));
+				await tx
+					.update(videos)
+					.set(
+						isLike
+							? { likeCount: sql`${videos.likeCount} - 1` }
+							: { dislikeCount: sql`${videos.dislikeCount} - 1` },
+					)
+					.where(eq(videos.id, videoId));
 
-			return { action: "removed", type };
-		} else {
-			const [updated] = await db
-				.update(videoLikes)
-				.set({ type })
-				.where(eq(videoLikes.id, existing.id))
-				.returning();
+				return { action: "removed", type };
+			} else {
+				const [updated] = await tx
+					.update(videoLikes)
+					.set({ type })
+					.where(eq(videoLikes.id, existing.id))
+					.returning();
 
-			await db
-				.update(videos)
-				.set(
-					isLike
-						? {
-								likeCount: sql`${videos.likeCount} + 1`,
-								dislikeCount: sql`${videos.dislikeCount} - 1`,
-							}
-						: {
-								likeCount: sql`${videos.likeCount} - 1`,
-								dislikeCount: sql`${videos.dislikeCount} + 1`,
-							},
-				)
-				.where(eq(videos.id, videoId));
+				await tx
+					.update(videos)
+					.set(
+						isLike
+							? {
+									likeCount: sql`${videos.likeCount} + 1`,
+									dislikeCount: sql`${videos.dislikeCount} - 1`,
+								}
+							: {
+									likeCount: sql`${videos.likeCount} - 1`,
+									dislikeCount: sql`${videos.dislikeCount} + 1`,
+								},
+					)
+					.where(eq(videos.id, videoId));
 
-			return { action: "updated", type: updated.type };
+				return { action: "updated", type: updated.type };
+			}
 		}
-	}
 
-	const [created] = await db
-		.insert(videoLikes)
-		.values({
-			videoId,
-			userId,
-			type,
-		})
-		.returning();
+		const [created] = await tx
+			.insert(videoLikes)
+			.values({
+				videoId,
+				userId,
+				type,
+			})
+			.returning();
 
-	await db
-		.update(videos)
-		.set(
-			isLike
-				? { likeCount: sql`${videos.likeCount} + 1` }
-				: { dislikeCount: sql`${videos.dislikeCount} + 1` },
-		)
-		.where(eq(videos.id, videoId));
+		await tx
+			.update(videos)
+			.set(
+				isLike
+					? { likeCount: sql`${videos.likeCount} + 1` }
+					: { dislikeCount: sql`${videos.dislikeCount} + 1` },
+			)
+			.where(eq(videos.id, videoId));
 
-	return { action: "created", type: created.type };
+		return { action: "created", type: created.type };
+	});
 };
 
 export const getUserLikeStatus = async (videoId: string, userId: string) => {
@@ -101,21 +103,23 @@ export const getVideoLikeCounts = async (videoId: string) => {
 };
 
 export const removeLike = async (videoId: string, userId: string) => {
-	const existing = await db.query.videoLikes.findFirst({
-		where: (t, { eq, and }) => and(eq(t.videoId, videoId), eq(t.userId, userId)),
+	return db.transaction(async (tx) => {
+		const existing = await tx.query.videoLikes.findFirst({
+			where: (t, { eq, and }) => and(eq(t.videoId, videoId), eq(t.userId, userId)),
+		});
+
+		if (!existing) throw new AppError("Like/dislike not found", 404);
+
+		await tx.delete(videoLikes).where(eq(videoLikes.id, existing.id));
+		await tx
+			.update(videos)
+			.set(
+				existing.type === "like"
+					? { likeCount: sql`${videos.likeCount} - 1` }
+					: { dislikeCount: sql`${videos.dislikeCount} - 1` },
+			)
+			.where(eq(videos.id, videoId));
+
+		return { message: "Like/dislike removed successfully" };
 	});
-
-	if (!existing) throw new AppError("Like/dislike not found", 404);
-
-	await db.delete(videoLikes).where(eq(videoLikes.id, existing.id));
-	await db
-		.update(videos)
-		.set(
-			existing.type === "like"
-				? { likeCount: sql`${videos.likeCount} - 1` }
-				: { dislikeCount: sql`${videos.dislikeCount} - 1` },
-		)
-		.where(eq(videos.id, videoId));
-
-	return { message: "Like/dislike removed successfully" };
 };
